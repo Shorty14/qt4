@@ -3850,7 +3850,8 @@ static QString getFmtString(const QString& f, const QTime* dt = 0, const QDate* 
             removed = 1;
         } else if (f.at(0).toUpper() == QLatin1Char('A')) {
             const bool upper = f.at(0) == QLatin1Char('A');
-            buf = dt->hour() < 12 ? QLatin1String("am") : QLatin1String("pm");
+            QLocale locale;
+            buf = dt->hour() < 12 ? locale.amText() : locale.pmText();
             if (upper)
                 buf = buf.toUpper();
             if (f.size() > 1 && f.at(1).toUpper() == QLatin1Char('P') &&
