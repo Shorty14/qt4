@@ -797,6 +797,8 @@ bool qt_dispatchKeyEventWithCocoa(void * /*NSEvent * */ keyEvent, QWidget *widge
 #ifdef QT_BLIZZARD_COCOA_KEY_EVENT
         if (isCapsLockEnabled([event modifierFlags]))
             text = text.toUpper();
+		else if (keyMods & Qt::AltModifier)
+			text = QCFString::toQString(reinterpret_cast<CFStringRef>([event characters]));
 #endif
     }
     
