@@ -91,6 +91,7 @@ static mng_bool myerror(mng_handle /*hMNG*/,
     mng_int32   iExtra2,
     mng_pchar   zErrortext)
 {
+#if 0
     qWarning("MNG error %d: %s; chunk %c%c%c%c; subcode %d:%d",
         iErrorcode,zErrortext,
         (iChunkname>>24)&0xff,
@@ -98,6 +99,7 @@ static mng_bool myerror(mng_handle /*hMNG*/,
         (iChunkname>>8)&0xff,
         (iChunkname>>0)&0xff,
         iExtra1,iExtra2);
+#endif
     return TRUE;
 }
 
