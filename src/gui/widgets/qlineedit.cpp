@@ -39,6 +39,8 @@
 **
 ****************************************************************************/
 
+#define QT_BLIZZARD_DISABLE_CONTROL_CHARACTER_MENU
+
 #include "qlineedit.h"
 #include "qlineedit_p.h"
 
@@ -2177,6 +2179,7 @@ QMenu *QLineEdit::createStandardContextMenu()
     }
 #endif
 
+#if !defined(QT_BLIZZARD_DISABLE_CONTROL_CHARACTER_MENU)
 #if defined(Q_WS_WIN) || defined(Q_WS_X11)
     if (!d->control->isReadOnly() && qt_use_rtl_extensions) {
 #else
@@ -2186,6 +2189,8 @@ QMenu *QLineEdit::createStandardContextMenu()
         QUnicodeControlCharacterMenu *ctrlCharacterMenu = new QUnicodeControlCharacterMenu(this, popup);
         popup->addMenu(ctrlCharacterMenu);
     }
+#endif // !defined QT_BLIZZARD_DISABLE_CONTROL_CHARACTER_MENU
+
     return popup;
 }
 #endif // QT_NO_CONTEXTMENU
