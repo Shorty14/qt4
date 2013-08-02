@@ -2706,8 +2706,7 @@ void QApplicationPrivate::enterModal_sys(QWidget *widget)
     if (!qt_modal_stack)
         qt_modal_stack = new QWidgetList;
 
-    releaseAutoCapture();
-    ClipCursor(0);
+    releaseAutoCapture();    
     QWidget *leave = qt_last_mouse_receiver;
     if (!leave)
         leave = QWidget::find((WId)curWin);
