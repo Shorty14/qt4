@@ -1,38 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
+** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-** Other Usage
-** Alternatively, this file may be used in accordance with the terms and
-** conditions contained in a signed written agreement between you and Nokia.
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -52,6 +52,12 @@
 #include <hal.h>
 #include <hal_data.h>
 #include <e32math.h>
+
+#include <QRegExp>
+// This can be manually enabled if debugging thread problems
+#ifdef QT_USE_RTTI_IN_THREAD_CLASSNAME
+#include <typeinfo>
+#endif
 
 // You only find these enumerations on Symbian^3 onwards, so we need to provide our own
 // to remain compatible with older releases. They won't be called by pre-Sym^3 SDKs.
@@ -258,19 +264,49 @@ private:
 QMutex QCAddAdoptedThread::adoptedThreadMonitorMutex;
 QCAddAdoptedThread* QCAddAdoptedThread::adoptedThreadAdder = 0;
 
-void QCAdoptedThreadMonitor::RunL()
+static void finishAdoptedThread(QThreadData* data, bool closeNativeHandle)
 {
     if (data->isAdopted) {
         QThread *thread = data->thread;
         Q_ASSERT(thread);
         QThreadPrivate *thread_p = static_cast<QThreadPrivate *>(QObjectPrivate::get(thread));
-        Q_ASSERT(!thread_p->finished);
-        thread_p->finish(thread);
+        if (!thread_p->finished)
+            thread_p->finish(thread, true, closeNativeHandle);
+        else if (closeNativeHandle && data->symbian_thread_handle.Handle())
+            data->symbian_thread_handle.Close();
     }
+}
+
+void QCAdoptedThreadMonitor::RunL()
+{
+    // clean up the thread, or close the handle if that's all that's left
+    finishAdoptedThread(data, true);
     data->deref();
     QCAddAdoptedThread::threadDied();
     delete this;
 }
+
+static pthread_once_t current_thread_data_once = PTHREAD_ONCE_INIT;
+static pthread_key_t current_thread_data_key;
+
+static void pthread_in_thread_cleanup(void *p)
+{
+    QThreadData *data = static_cast<QThreadData *>(p);
+    // clean up the thread, but leave the handle for adoptedThreadMonitor
+    finishAdoptedThread(data, false);
+}
+
+static void create_current_thread_data_key()
+{
+    pthread_key_create(&current_thread_data_key, pthread_in_thread_cleanup);
+}
+
+static void destroy_current_thread_data_key()
+{
+    pthread_once(&current_thread_data_once, create_current_thread_data_key);
+    pthread_key_delete(current_thread_data_key);
+}
+Q_DESTRUCTOR_FUNCTION(destroy_current_thread_data_key)
 
 void QAdoptedThread::init()
 {
@@ -278,6 +314,8 @@ void QAdoptedThread::init()
     d->thread_id = RThread().Id();  // type operator to TUint
     init_symbian_thread_handle(d->data->symbian_thread_handle);
     QCAddAdoptedThread::add(this);
+    pthread_once(&current_thread_data_once, create_current_thread_data_key);
+    pthread_setspecific(current_thread_data_key, get_thread_data());
 }
 
 /*
@@ -520,17 +558,31 @@ void QThread::start(Priority priority)
         d->stackSize = 0x14000; // Maximum stack size on Symbian.
 
     int code = KErrAlreadyExists;
-    QString objName = objectName();
-    TPtrC objNamePtr(qt_QString2TPtrC(objName));
-    TName name;
-    objNamePtr.Set(objNamePtr.Left(qMin(objNamePtr.Length(), name.MaxLength() - 16)));
+    QString className(QLatin1String(metaObject()->className()));
+#ifdef QT_USE_RTTI_IN_THREAD_CLASSNAME
+    // use RTTI, if enabled, to get a more accurate className. This must be manually enabled.
+    const char* rttiName = typeid(*this).name();
+    if (rttiName)
+        className = QLatin1String(rttiName);
+#endif
+    QString threadNameBase = QString(QLatin1String("%1_%2_v=0x%3_")).arg(objectName()).arg(className).arg(*(uint*)this,8,16,QLatin1Char('0'));
+    // Thread name can contain only characters allowed by User::ValidateName() otherwise RThread::Create fails.
+    // Not allowed characters are:
+    // - any character outside range 0x20 - 0x7e
+    // - or asterisk, question mark or colon
+    const QRegExp notAllowedChars(QLatin1String("[^\\x20-\\x7e]|\\*|\\?|\\:"));
+    threadNameBase.replace(notAllowedChars, QLatin1String("_"));
+
+    TPtrC threadNameBasePtr(qt_QString2TPtrC(threadNameBase));
+    // max thread name length is KMaxKernelName
+    TBuf<KMaxKernelName> name;
+    threadNameBasePtr.Set(threadNameBasePtr.Left(qMin(threadNameBasePtr.Length(), name.MaxLength() - 8)));
     const int MaxRetries = 10;
     for (int i=0; i<MaxRetries && code == KErrAlreadyExists; i++) {
-        // generate a thread name using a similar method to libpthread in Symbian
+        // generate a thread name with a random component to avoid and resolve name collisions
         // a named thread can be opened from another process
         name.Zero();
-        name.Append(objNamePtr);
-        name.AppendNumFixedWidth(int(this), EHex, 8);
+        name.Append(threadNameBasePtr);
         name.AppendNumFixedWidth(Math::Random(), EHex, 8);
         code = d->data->symbian_thread_handle.Create(name, (TThreadFunction) QThreadPrivate::start, d->stackSize, NULL, this);
     }

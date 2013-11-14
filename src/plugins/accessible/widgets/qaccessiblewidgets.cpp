@@ -1,38 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
+** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the plugins of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-** Other Usage
-** Alternatively, this file may be used in accordance with the terms and
-** conditions contained in a signed written agreement between you and Nokia.
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -47,6 +47,7 @@
 #include "private/qtextedit_p.h"
 #include "qtextdocument.h"
 #include "qtextobject.h"
+#include "qplaintextedit.h"
 #include "qscrollbar.h"
 #include "qdebug.h"
 #include <QApplication>
@@ -245,6 +246,57 @@ static int qTextBlockPosition(QTextBlock block)
     return child;
 }
 
+QAccessiblePlainTextEdit::QAccessiblePlainTextEdit(QWidget* o)
+  :QAccessibleTextWidget(o)
+{
+}
+
+QPlainTextEdit* QAccessiblePlainTextEdit::plainTextEdit() const
+{
+    return static_cast<QPlainTextEdit *>(widget());
+}
+
+QPoint QAccessiblePlainTextEdit::scrollBarPosition() const
+{
+    QPoint result;
+    result.setX(plainTextEdit()->horizontalScrollBar() ? plainTextEdit()->horizontalScrollBar()->sliderPosition() : 0);
+    result.setY(plainTextEdit()->verticalScrollBar() ? plainTextEdit()->verticalScrollBar()->sliderPosition() : 0);
+    return result;
+}
+
+QTextCursor QAccessiblePlainTextEdit::textCursor() const
+{
+    return plainTextEdit()->textCursor();
+}
+
+void QAccessiblePlainTextEdit::setTextCursor(const QTextCursor &textCursor)
+{
+    plainTextEdit()->setTextCursor(textCursor);
+}
+
+int QAccessiblePlainTextEdit::childCount() const
+{
+    return 0;
+}
+
+QTextDocument* QAccessiblePlainTextEdit::textDocument() const
+{
+    return plainTextEdit()->document();
+}
+
+QWidget* QAccessiblePlainTextEdit::viewport() const
+{
+    return plainTextEdit()->viewport();
+}
+
+void QAccessiblePlainTextEdit::scrollToSubstring(int startIndex, int endIndex)
+{
+    //TODO: Not implemented
+    Q_UNUSED(startIndex);
+    Q_UNUSED(endIndex);
+}
+
+
 /*!
   \fn QAccessibleTextEdit::QAccessibleTextEdit(QWidget* widget)
 
@@ -283,9 +335,9 @@ QWidget* QAccessibleTextEdit::viewport() const
     return textEdit()->viewport();
 }
 
-QPoint QAccessibleTextEdit::scrollBarsCurrentPosition() const
+QPoint QAccessibleTextEdit::scrollBarPosition() const
 {
-    QPoint result(0, 0);
+    QPoint result;
     result.setX(textEdit()->horizontalScrollBar() ? textEdit()->horizontalScrollBar()->sliderPosition() : 0);
     result.setY(textEdit()->verticalScrollBar() ? textEdit()->verticalScrollBar()->sliderPosition() : 0);
     return result;
@@ -1381,16 +1433,20 @@ QRect QAccessibleTextWidget::characterRect(int offset, CoordinateType coordType)
 
             r.setWidth(averageCharWidth);
         }
+        int height = line.height();
+
+        // make sure that height does not include leading. (only ascent + descent + 1)
+        if (line.leadingIncluded())
+            height -= qRound(line.leading());
         r = QRect(layoutPosition.x() + x, layoutPosition.y() + line.y(),
-                  w, line.height());
+                  w, height);
 
         if (coordType == RelativeToScreen) {
             r.moveTo(viewport()->mapToGlobal(r.topLeft()));
         }
 
+        r.translate(-scrollBarPosition());
     }
-
-    r.translate(-scrollBarsCurrentPosition());
 
     return r;
 }
@@ -1401,7 +1457,7 @@ int QAccessibleTextWidget::offsetAtPoint(const QPoint &point, CoordinateType coo
     if (coordType == RelativeToScreen)
         p = viewport()->mapFromGlobal(p);
 
-    p += scrollBarsCurrentPosition();
+    p += scrollBarPosition();
 
     return textDocument()->documentLayout()->hitTest(p, Qt::ExactHit);
 }
@@ -1548,7 +1604,7 @@ QString QAccessibleTextWidget::text(int startOffset, int endOffset)
     return cursor.selectedText();
 }
 
-QPoint QAccessibleTextWidget::scrollBarsCurrentPosition() const
+QPoint QAccessibleTextWidget::scrollBarPosition() const
 {
     return QPoint(0, 0);
 }
@@ -1570,6 +1626,7 @@ QPair< int, int > QAccessibleTextWidget::getBoundaries(int offset, BoundaryType 
         result.first = cursor.position();
         cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
         result.second = cursor.position();
+        break;
     case WordBoundary:
         cursor.movePosition(QTextCursor::StartOfWord, QTextCursor::MoveAnchor);
         result.first = cursor.position();

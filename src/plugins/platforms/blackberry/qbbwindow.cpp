@@ -1,36 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 - 2012 Research In Motion
-**
-** Contact: Research In Motion <blackberry-qt@qnx.com>
-** Contact: Klarälvdalens Datakonsult AB <info@kdab.com>
+** Copyright (C) 2011 - 2012 Research In Motion <blackberry-qt@qnx.com>
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -52,7 +54,7 @@
 
 QT_BEGIN_NAMESPACE
 
-QBBWindow::QBBWindow(QWidget *window, screen_context_t context)
+QBBWindow::QBBWindow(QWidget *window, screen_context_t context, QBBScreen *screen)
     : QPlatformWindow(window),
       mContext(context),
       mCurrentBufferIndex(-1),
@@ -120,10 +122,14 @@ QBBWindow::QBBWindow(QWidget *window, screen_context_t context)
     }
 
     // Set the screen to the primary display (this is the default specified by screen).
-    setScreen(QBBScreen::primaryDisplay());
+    setScreen(screen);
 
-    // Add the window to the root of the Hierarchy.
-    QBBScreen::addWindow(this);
+    // Qt somtimes doesn't call these setters after creating the window, so we need to do that
+    // ourselves here
+    if (window->parentWidget() && window->parentWidget()->platformWindow())
+        setParent(window->parentWidget()->platformWindow());
+    setGeometry(window->geometry());
+    setVisible(window->isVisible());
 }
 
 QBBWindow::~QBBWindow()
@@ -132,14 +138,12 @@ QBBWindow::~QBBWindow()
     qDebug() << "QBBWindow::~QBBWindow - w=" << widget();
 #endif
 
+    // Qt should have already deleted the children before deleting the parent.
+    Q_ASSERT(mChildren.size() == 0);
+
     // Remove from parent's Hierarchy.
     removeFromParent();
-    QBBScreen::updateHierarchy();
-
-    // We shouldn't allow this case unless QT allows it. Does it? Or should we send the
-    // handleCloseEvent on all children when this window is deleted?
-    if (mChildren.size() > 0)
-        qFatal("QBBWindow: window destroyed before children!");
+    mScreen->updateHierarchy();
 
     // cleanup OpenGL/OpenVG context if it exists
     if (mPlatformGlContext != NULL) {
@@ -240,6 +244,11 @@ void QBBWindow::setVisible(bool visible)
     root->updateVisibility(root->mVisible);
 
     widget()->activateWindow();
+
+    if (!visible) {
+        // Flush the context, otherwise it won't disappear immediately
+        screen_flush_context(mContext, 0);
+    }
 }
 
 void QBBWindow::updateVisibility(bool parentVisible)
@@ -315,6 +324,18 @@ void QBBWindow::setBufferSize(const QSize &size)
         if (result != 0) {
             qFatal("QBBWindow: failed to create window buffers, errno=%d", errno);
         }
+
+        // check if there are any buffers available
+        int bufferCount = 0;
+        result = screen_get_window_property_iv(mWindow, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &bufferCount);
+
+        if (result != 0) {
+            qFatal("QBBWindow: failed to query window buffer count, errno=%d", errno);
+        }
+
+        if (bufferCount != MAX_BUFFER_COUNT) {
+            qFatal("QBBWindow: invalid buffer count. Expected = %d, got = %d", MAX_BUFFER_COUNT, bufferCount);
+        }
     }
 
     // cache new buffer size
@@ -332,13 +353,30 @@ QBBBuffer &QBBWindow::renderBuffer()
     qDebug() << "QBBWindow::renderBuffer - w=" << widget();
 #endif
 
+    return buffer(BACK_BUFFER);
+}
+
+QBBBuffer &QBBWindow::frontBuffer()
+{
+#if defined(QBBWINDOW_DEBUG)
+    qDebug() << "QBBWindow::frontBuffer - w=" << widget();
+#endif
+
+    return buffer(FRONT_BUFFER);
+}
+
+QBBBuffer &QBBWindow::buffer(QBBWindow::Buffer bufferIndex)
+{
+#if defined(QBBWINDOW_DEBUG)
+    qDebug() << "QBBWindow::buffer - w=" << widget();
+#endif
+
     // check if render buffer is invalid
     if (mCurrentBufferIndex == -1) {
-
         // get all buffers available for rendering
         errno = 0;
         screen_buffer_t buffers[MAX_BUFFER_COUNT];
-        int result = screen_get_window_property_pv(mWindow, SCREEN_PROPERTY_RENDER_BUFFERS, (void **)buffers);
+        const int result = screen_get_window_property_pv(mWindow, SCREEN_PROPERTY_RENDER_BUFFERS, (void **)buffers);
         if (result != 0) {
             qFatal("QBBWindow: failed to query window buffers, errno=%d", errno);
         }
@@ -353,6 +391,20 @@ QBBBuffer &QBBWindow::renderBuffer()
         mPreviousBufferIndex = -1;
     }
 
+    if (bufferIndex == BACK_BUFFER) {
+        return mBuffers[mCurrentBufferIndex];
+    } else if (bufferIndex == FRONT_BUFFER) {
+        int buf = mCurrentBufferIndex - 1;
+
+        if (buf < 0)
+            buf = MAX_BUFFER_COUNT - 1;
+
+        return mBuffers[buf];
+    }
+
+    qFatal("QBBWindow::buffer() - invalid buffer index. Aborting");
+
+    // never happens
     return mBuffers[mCurrentBufferIndex];
 }
 
@@ -428,6 +480,9 @@ void QBBWindow::setScreen(QBBScreen *platformScreen)
     if (mScreen == platformScreen)
         return;
 
+    if (mScreen)
+        mScreen->removeWindow(this);
+    platformScreen->addWindow(this);
     mScreen = platformScreen;
 
     // The display may not have a root (desktop) window yet so we must ensure that one has been
@@ -458,7 +513,7 @@ void QBBWindow::setScreen(QBBScreen *platformScreen)
             (*it)->setScreen(platformScreen);
     }
 
-    QBBScreen::updateHierarchy();
+    mScreen->updateHierarchy();
 }
 
 void QBBWindow::removeFromParent()
@@ -470,7 +525,7 @@ void QBBWindow::removeFromParent()
         else
             qFatal("QBBWindow: Window Hierarchy broken; window has parent, but parent hasn't got child.");
     } else {
-        QBBScreen::removeWindow(this);
+        mScreen->removeWindow(this);
     }
 }
 
@@ -499,10 +554,10 @@ void QBBWindow::setParent(const QPlatformWindow *window)
 
         mParent->mChildren.push_back(this);
     } else {
-        QBBScreen::addWindow(this);
+        mScreen->addWindow(this);
     }
 
-    QBBScreen::updateHierarchy();
+    mScreen->updateHierarchy();
 }
 
 void QBBWindow::raise()
@@ -511,15 +566,14 @@ void QBBWindow::raise()
     qDebug() << "QBBWindow::raise - w=" << widget();
 #endif
 
-    QBBWindow* oldParent = mParent;
-    if (oldParent) {
-        removeFromParent();
-        oldParent->mChildren.push_back(this);
+    if (mParent) {
+        mParent->mChildren.removeAll(this);
+        mParent->mChildren.push_back(this);
     } else {
-        QBBScreen::raiseWindow(this);
+        mScreen->raiseWindow(this);
     }
 
-    QBBScreen::updateHierarchy();
+    mScreen->updateHierarchy();
 }
 
 void QBBWindow::lower()
@@ -528,15 +582,14 @@ void QBBWindow::lower()
     qDebug() << "QBBWindow::lower - w=" << widget();
 #endif
 
-    QBBWindow* oldParent = mParent;
-    if (oldParent) {
-        removeFromParent();
-        oldParent->mChildren.push_front(this);
+    if (mParent) {
+        mParent->mChildren.removeAll(this);
+        mParent->mChildren.push_front(this);
     } else {
-        QBBScreen::lowerWindow(this);
+        mScreen->lowerWindow(this);
     }
 
-    QBBScreen::updateHierarchy();
+    mScreen->updateHierarchy();
 }
 
 void QBBWindow::requestActivateWindow()
@@ -559,6 +612,20 @@ void QBBWindow::gainedFocus()
 
     // Got focus
     QWindowSystemInterface::handleWindowActivated(widget());
+}
+
+QBBWindow *QBBWindow::findWindow(screen_window_t windowHandle)
+{
+    if (mWindow == windowHandle)
+        return this;
+
+    Q_FOREACH (QBBWindow *window, mChildren) {
+        QBBWindow * const result = window->findWindow(windowHandle);
+        if (result)
+            return result;
+    }
+
+    return 0;
 }
 
 void QBBWindow::updateZorder(int &topZorder)

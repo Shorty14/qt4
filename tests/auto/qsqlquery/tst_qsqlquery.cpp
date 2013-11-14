@@ -1,38 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
+** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the test suite of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-** Other Usage
-** Alternatively, this file may be used in accordance with the terms and
-** conditions contained in a signed written agreement between you and Nokia.
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -163,6 +163,8 @@ private slots:
     void lastInsertId();
     void lastQuery_data() { generic_data(); }
     void lastQuery();
+    void bindBool_data() { generic_data(); }
+    void bindBool();
     void bindWithDoubleColonCastOperator_data() { generic_data(); }
     void bindWithDoubleColonCastOperator();
     void queryOnInvalidDatabase_data() { generic_data(); }
@@ -215,6 +217,13 @@ private slots:
     void QTBUG_14132();
     void QTBUG_21884_data() { generic_data("QSQLITE"); }
     void QTBUG_21884();
+    void QTBUG_16967_data() { generic_data("QSQLITE"); }
+    void QTBUG_16967(); //clean close
+    void QTBUG_14904_data() { generic_data("QSQLITE"); }
+    void QTBUG_14904();
+
+    void QTBUG_2192_data() { generic_data(); }
+    void QTBUG_2192();
 
     void sqlite_constraint_data() { generic_data("QSQLITE"); }
     void sqlite_constraint();
@@ -336,7 +345,8 @@ void tst_QSqlQuery::dropTestTables( QSqlDatabase db )
                << qTableName( "task_250026", __FILE__ )
                << qTableName( "task_234422", __FILE__ )
                << qTableName("test141895", __FILE__)
-               << qTableName("qtest_oraOCINumber", __FILE__);
+               << qTableName("qtest_oraOCINumber", __FILE__)
+               << qTableName( "bug2192", __FILE__);
 
     if ( db.driverName().startsWith("QPSQL") )
         tablenames << qTableName("task_233829", __FILE__);
@@ -565,6 +575,39 @@ void tst_QSqlQuery::mysqlOutValues()
     QCOMPARE( q.value( 0 ).toInt(), 42 );
 
     QVERIFY_SQL( q, exec( "drop procedure " + qtestproc ) );
+}
+
+void tst_QSqlQuery::bindBool()
+{
+    // QTBUG-27763: bool value got converted to int 127 by mysql driver becuase sizeof(bool) < sizeof(int).
+    // The problem was the way the bool value from the application was handled. It doesn't matter
+    // whether the table column type is BOOL or INT. Use INT here because all DBMSs have it and all
+    // should pass this test.
+    QFETCH( QString, dbName );
+    QSqlDatabase db = QSqlDatabase::database( dbName );
+    CHECK_DATABASE( db );
+    QSqlQuery q(db);
+
+    const QString tableName(qTableName( "bindBool", __FILE__ ));
+    q.exec("DROP TABLE " + tableName);
+    QVERIFY_SQL(q, exec("CREATE TABLE " + tableName + " (id INT, flag INT NOT NULL, PRIMARY KEY(id))"));
+
+    for (int i = 0; i < 2; ++i) {
+        bool flag = i;
+        q.prepare("INSERT INTO " + tableName + " (id, flag) VALUES(:id, :flag)");
+        q.bindValue(":id", i);
+        q.bindValue(":flag", flag);
+        QVERIFY_SQL(q, exec());
+    }
+
+    QVERIFY_SQL(q, exec("SELECT id, flag FROM " + tableName));
+    for (int i = 0; i < 2; ++i) {
+        bool flag = i;
+        QVERIFY_SQL(q, next());
+        QCOMPARE(q.value(0).toInt(), i);
+        QCOMPARE(q.value(1).toBool(), flag);
+    }
+    QVERIFY_SQL(q, exec("DROP TABLE " + tableName));
 }
 
 void tst_QSqlQuery::oraOutValues()
@@ -981,6 +1024,10 @@ void tst_QSqlQuery::isActive()
     QVERIFY( q.isActive() );
 
     QVERIFY_SQL( q, exec( "update " + qtest + " set id = 42 where id = 41" ) );
+
+    QVERIFY( q.isActive() );
+
+    QVERIFY_SQL( q, exec( "delete from " + qtest + " where id = 42" ) );
 
     QVERIFY( q.isActive() );
 
@@ -3150,6 +3197,122 @@ void tst_QSqlQuery::QTBUG_21884()
     }
 }
 
+/**
+  * This test case test sqlite driver close function. Sqlite driver should close cleanly
+  * even if there is still outstanding prepared statement.
+  */
+void tst_QSqlQuery::QTBUG_16967()
+{
+    QSqlQuery q2;
+    QFETCH(QString, dbName);
+    {
+        QSqlDatabase db = QSqlDatabase::database(dbName);
+        CHECK_DATABASE(db);
+        db.close();
+        QCOMPARE(db.lastError().type(), QSqlError::NoError);
+    }
+    {
+        QSqlDatabase db = QSqlDatabase::database(dbName);
+        CHECK_DATABASE(db);
+        QSqlQuery q(db);
+        q2 = q;
+        q.prepare("CREATE TABLE t1 (id INTEGER PRIMARY KEY, str TEXT);");
+        db.close();
+        QCOMPARE(db.lastError().type(), QSqlError::NoError);
+    }
+    {
+        QSqlDatabase db = QSqlDatabase::database(dbName);
+        CHECK_DATABASE(db);
+        QSqlQuery q(db);
+        q2 = q;
+        q2.prepare("CREATE TABLE t1 (id INTEGER PRIMARY KEY, str TEXT);");
+        q2.exec();
+        db.close();
+        QCOMPARE(db.lastError().type(), QSqlError::NoError);
+    }
+    {
+        QSqlDatabase db = QSqlDatabase::database(dbName);
+        CHECK_DATABASE(db);
+        QSqlQuery q(db);
+        q2 = q;
+        q.exec("INSERT INTO t1 (id, str) VALUES(1, \"test1\");");
+        db.close();
+        QCOMPARE(db.lastError().type(), QSqlError::NoError);
+    }
+    {
+        QSqlDatabase db = QSqlDatabase::database(dbName);
+        CHECK_DATABASE(db);
+        QSqlQuery q(db);
+        q2 = q;
+        q2.exec("SELECT * FROM t1;");
+        db.close();
+        QCOMPARE(db.lastError().type(), QSqlError::NoError);
+    }
+}
+
+/**
+  * Test for aliases with dots
+  */
+void tst_QSqlQuery::QTBUG_14904()
+{
+    QFETCH(QString, dbName);
+    QSqlDatabase db = QSqlDatabase::database(dbName);
+    CHECK_DATABASE(db);
+
+    QSqlQuery q(db);
+
+    QString tableName(qTableName("bug14904", __FILE__ ));
+    tst_Databases::safeDropTable( db, tableName );
+
+    q.prepare("create table " + tableName + "(val1 int)");
+    QVERIFY_SQL(q, exec());
+    q.prepare("insert into " + tableName + "(val1) values(?);");
+    q.addBindValue(1);
+    QVERIFY_SQL(q, exec());
+
+    QString sql="select val1 AS value1 from " + tableName;
+    QVERIFY_SQL(q, exec(sql));
+    QVERIFY_SQL(q, next());
+
+    QCOMPARE(q.record().indexOf("value1"), 0);
+    QCOMPARE(q.record().field(0).type(), QVariant::Int);
+    QCOMPARE(q.value(0).toInt(), 1);
+
+    sql="select val1 AS 'value.one' from " + tableName;
+    QVERIFY_SQL(q, exec(sql));
+    QVERIFY_SQL(q, next());
+    QCOMPARE(q.record().indexOf("value.one"), 0);  // was -1 before bug fix
+    QCOMPARE(q.record().field(0).type(), QVariant::Int);
+    QCOMPARE(q.value(0).toInt(), 1);
+}
+
+void tst_QSqlQuery::QTBUG_2192()
+{
+    QFETCH( QString, dbName );
+    QSqlDatabase db = QSqlDatabase::database( dbName );
+    CHECK_DATABASE( db );
+    {
+        const QString tableName(qTableName("bug2192", __FILE__));
+        tst_Databases::safeDropTable( db, tableName );
+
+        QSqlQuery q(db);
+        QVERIFY_SQL(q, exec("CREATE TABLE " + tableName + " (dt DATETIME)"));
+
+        QDateTime dt = QDateTime(QDate(2012, 7, 4), QTime(23, 59, 59, 999));
+        QVERIFY_SQL(q, prepare("INSERT INTO " + tableName + " (dt) VALUES (?)"));
+        q.bindValue(0, dt);
+        QVERIFY_SQL(q, exec());
+
+        QVERIFY_SQL(q, exec("SELECT dt FROM " + tableName));
+        QVERIFY_SQL(q, next());
+
+        // Check if retrieved value preserves reported precision
+        int precision = qMax(0, q.record().field("dt").precision());
+        int diff = qAbs(q.value(0).toDateTime().msecsTo(dt));
+        int keep = qMin(1000, (int)qPow(10.0, precision));
+        QVERIFY(diff <= 1000 - keep);
+    }
+}
 
 void tst_QSqlQuery::oraOCINumber()
 {

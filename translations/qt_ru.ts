@@ -3055,6 +3055,13 @@ Please verify the correct directory name was given.</source>
     </message>
 </context>
 <context>
+    <name>QGroupBox</name>
+    <message>
+        <source>Toggle</source>
+        <translation>Вкл/выкл</translation>
+    </message>
+</context>
+<context>
     <name>QHostInfo</name>
     <message>
         <source>Unknown error</source>
@@ -3086,6 +3093,10 @@ Please verify the correct directory name was given.</source>
     <message>
         <source>Invalid hostname</source>
         <translation>Некорректное имя узла</translation>
+    </message>
+    <message>
+        <source>Unknown error (%1)</source>
+        <translation>Неизвестная ошибка (%1)</translation>
     </message>
 </context>
 <context>
@@ -3730,8 +3741,8 @@ Please verify the correct directory name was given.</source>
         <translation>&lt;h3&gt;О Qt&lt;/h3&gt;&lt;p&gt;Данная программа использует Qt версии %1.&lt;/p&gt;</translation>
     </message>
     <message>
-        <source>&lt;p&gt;Qt is a C++ toolkit for cross-platform application development.&lt;/p&gt;&lt;p&gt;Qt provides single-source portability across MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux, and all major commercial Unix variants. Qt is also available for embedded devices as Qt for Embedded Linux and Qt for Windows CE.&lt;/p&gt;&lt;p&gt;Qt is available under three different licensing options designed to accommodate the needs of our various users.&lt;/p&gt;&lt;p&gt;Qt licensed under our commercial license agreement is appropriate for development of proprietary/commercial software where you do not want to share any source code with third parties or otherwise cannot comply with the terms of the GNU LGPL version 2.1 or GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU LGPL version 2.1 is appropriate for the development of Qt applications (proprietary or open source) provided you can comply with the terms and conditions of the GNU LGPL version 2.1.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU General Public License version 3.0 is appropriate for the development of Qt applications where you wish to use such applications in combination with software subject to the terms of the GNU GPL version 3.0 or where you are otherwise willing to comply with the terms of the GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Please see &lt;a href=&quot;http://qt.nokia.com/products/licensing&quot;&gt;qt.nokia.com/products/licensing&lt;/a&gt; for an overview of Qt licensing.&lt;/p&gt;&lt;p&gt;Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).&lt;/p&gt;&lt;p&gt;Qt is a Nokia product. See &lt;a href=&quot;http://qt.nokia.com/&quot;&gt;qt.nokia.com&lt;/a&gt; for more information.&lt;/p&gt;</source>
-        <translation>&lt;p&gt;Qt - это инструментарий для разработки кроссплатформенных приложений на C++.&lt;/p&gt;&lt;p&gt;Qt предоставляет совместимость на уровне исходных текстов между MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux и всеми популярными коммерческими вариантами Unix. Также Qt доступна для встраиваемых устройств в виде Qt для Embedded Linux и Qt для Windows CE.&lt;/p&gt;&lt;p&gt;Qt доступна под тремя различными лицензиями, разработанными для удовлетворения различных требований.&lt;/p&gt;&lt;p&gt;Qt под нашей коммерческой лицензией предназначена для развития проприетарного/коммерческого программного обеспечения, когда Вы не желаете предоставлять исходные тексты третьим сторонам, или в случае невозможности принятия условий лицензий GNU LGPL версии 2.1 или GNU GPL версии 3.0.&lt;/p&gt;&lt;p&gt;Qt под лицензией GNU LGPL версии 2.1 предназначена для разработки программного обеспечения с открытыми исходными текстами или коммерческого программного обеспечения при соблюдении условий лицензии GNU LGPL версии 2.1.&lt;/p&gt;&lt;p&gt;Qt под лицензией GNU General Public License версии 3.0 предназначена для разработки программных приложений в тех случаях, когда Вы хотели бы использовать такие приложения в сочетании с программным обеспечением на условиях лицензии GNU GPL с версии 3.0 или если Вы готовы соблюдать условия лицензии GNU GPL версии 3.0.&lt;/p&gt;&lt;p&gt;Обратитесь к &lt;a href=&quot;http://qt.nokia.com/products/licensing&quot;&gt;qt.nokia.com/products/licensing&lt;/a&gt; для обзора лицензий Qt.&lt;/p&gt;&lt;p&gt;Copyright (C) 2012 Корпорация Nokia и/или её дочерние подразделения.&lt;/p&gt;&lt;p&gt;Qt - продукт компании Nokia. Обратитесь к &lt;a href=&quot;http://qt.nokia.com/&quot;&gt;qt.nokia.com&lt;/a&gt; для получения дополнительной информации.&lt;/p&gt;</translation>
+        <source>&lt;p&gt;Qt is a C++ toolkit for cross-platform application development.&lt;/p&gt;&lt;p&gt;Qt provides single-source portability across MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux, and all major commercial Unix variants. Qt is also available for embedded devices as Qt for Embedded Linux and Qt for Windows CE.&lt;/p&gt;&lt;p&gt;Qt is available under three different licensing options designed to accommodate the needs of our various users.&lt;/p&gt;&lt;p&gt;Qt licensed under our commercial license agreement is appropriate for development of proprietary/commercial software where you do not want to share any source code with third parties or otherwise cannot comply with the terms of the GNU LGPL version 2.1 or GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU LGPL version 2.1 is appropriate for the development of Qt applications (proprietary or open source) provided you can comply with the terms and conditions of the GNU LGPL version 2.1.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU General Public License version 3.0 is appropriate for the development of Qt applications where you wish to use such applications in combination with software subject to the terms of the GNU GPL version 3.0 or where you are otherwise willing to comply with the terms of the GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Please see &lt;a href=&quot;http://qt.digia.com/product/licensing&quot;&gt;qt.digia.com/product/licensing&lt;/a&gt; for an overview of Qt licensing.&lt;/p&gt;&lt;p&gt;Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).&lt;/p&gt;&lt;p&gt;Qt is a Digia product. See &lt;a href=&quot;http://qt.digia.com/&quot;&gt;qt.digia.com&lt;/a&gt; for more information.&lt;/p&gt;</source>
+        <translation>&lt;p&gt;Qt - это инструментарий для разработки кроссплатформенных приложений на C++.&lt;/p&gt;&lt;p&gt;Qt предоставляет совместимость на уровне исходных текстов между MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux и всеми популярными коммерческими вариантами Unix. Также Qt доступна для встраиваемых устройств в виде Qt для Embedded Linux и Qt для Windows CE.&lt;/p&gt;&lt;p&gt;Qt доступна под тремя различными лицензиями, разработанными для удовлетворения различных требований.&lt;/p&gt;&lt;p&gt;Qt под нашей коммерческой лицензией предназначена для развития проприетарного/коммерческого программного обеспечения, когда Вы не желаете предоставлять исходные тексты третьим сторонам, или в случае невозможности принятия условий лицензий GNU LGPL версии 2.1 или GNU GPL версии 3.0.&lt;/p&gt;&lt;p&gt;Qt под лицензией GNU LGPL версии 2.1 предназначена для разработки программного обеспечения с открытыми исходными текстами или коммерческого программного обеспечения при соблюдении условий лицензии GNU LGPL версии 2.1.&lt;/p&gt;&lt;p&gt;Qt под лицензией GNU General Public License версии 3.0 предназначена для разработки программных приложений в тех случаях, когда Вы хотели бы использовать такие приложения в сочетании с программным обеспечением на условиях лицензии GNU GPL с версии 3.0 или если Вы готовы соблюдать условия лицензии GNU GPL версии 3.0.&lt;/p&gt;&lt;p&gt;Обратитесь к &lt;a href=&quot;http://qt.digia.com/product/licensing&quot;&gt;qt.digia.com/product/licensing&lt;/a&gt; для обзора лицензий Qt.&lt;/p&gt;&lt;p&gt;Copyright (C) 2012 Корпорация Digia и/или её дочерние подразделения.&lt;/p&gt;&lt;p&gt;Qt - продукт компании Digia. Обратитесь к &lt;a href=&quot;http://qt.digia.com/&quot;&gt;qt.digia.com&lt;/a&gt; для получения дополнительной информации.&lt;/p&gt;</translation>
     </message>
     <message>
         <source>About Qt</source>
@@ -4179,6 +4190,46 @@ Please verify the correct directory name was given.</source>
     <message>
         <source>Host not found</source>
         <translation>Узел не найден</translation>
+    </message>
+    <message>
+        <source>Could not read image data</source>
+        <translation>Не удалось прочитать данные изображения</translation>
+    </message>
+    <message>
+        <source>Sequential device (eg socket) for image read not supported</source>
+        <translation>Не поддерживается чтения изображений из последовательных устройств (например сокета)</translation>
+    </message>
+    <message>
+        <source>Seek file/device for image read failed</source>
+        <translation>Не удалось произвести перемещение по файлу/устройству для чтения изображения</translation>
+    </message>
+    <message>
+        <source>Image mHeader read failed</source>
+        <translation>Не удалось прочитать mHeader изображения</translation>
+    </message>
+    <message>
+        <source>Image type not supported</source>
+        <translation>Тип изображения не поддерживается</translation>
+    </message>
+    <message>
+        <source>Image depth not valid</source>
+        <translation>Недопустимая глубина цвета изображения</translation>
+    </message>
+    <message>
+        <source>Could not seek to image read footer</source>
+        <translation>Не удалось переместиться к концу изображения</translation>
+    </message>
+    <message>
+        <source>Could not read footer</source>
+        <translation>Не удалось прочитать окончание изображения</translation>
+    </message>
+    <message>
+        <source>Image type (non-TrueVision 2.0) not supported</source>
+        <translation>Тип изображения (отличный от TrueVision 2.0) не поддерживается</translation>
+    </message>
+    <message>
+        <source>Could not reset to start position</source>
+        <translation>Не удалось сбросить в исходную позицию</translation>
     </message>
 </context>
 <context>
@@ -5066,6 +5117,10 @@ Please choose a different file name.</source>
     <message>
         <source>Unable to execute statement</source>
         <translation>Невозможно выполнить выражение</translation>
+    </message>
+    <message>
+        <source>Unable to execute multiple statements at a time</source>
+        <translation>Невозможно одновременно запустить несколько операторов</translation>
     </message>
     <message>
         <source>Unable to reset statement</source>
@@ -6947,6 +7002,26 @@ Please choose a different file name.</source>
     <message>
         <source>Scroll Right</source>
         <translation>Прокрутить вправо</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Закрыть</translation>
+    </message>
+    <message>
+        <source>Activate</source>
+        <translation>Активировать</translation>
+    </message>
+    <message>
+        <source>Press</source>
+        <translation>Нажать</translation>
+    </message>
+    <message>
+        <source>Close the tab</source>
+        <translation>Закрыть вкладку</translation>
+    </message>
+    <message>
+        <source>Activate the tab</source>
+        <translation>Активировать вкладку</translation>
     </message>
 </context>
 <context>
@@ -10189,7 +10264,7 @@ Please choose a different file name.</source>
     </message>
     <message>
         <source>Field %1 has no simple type.</source>
-        <translation type="unfinished">Поле %1 имеет не простой тип.</translation>
+        <translation>Поле %1 не имеет простого типа.</translation>
     </message>
     <message>
         <source>ID value &apos;%1&apos; is not unique.</source>

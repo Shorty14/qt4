@@ -1,38 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
+** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the test suite of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-** Other Usage
-** Alternatively, this file may be used in accordance with the terms and
-** conditions contained in a signed written agreement between you and Nokia.
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -64,6 +64,12 @@ QRunnable *createTask(FunctionPointer pointer)
 class tst_QThreadPool : public QObject
 {
     Q_OBJECT
+public:
+    tst_QThreadPool();
+    ~tst_QThreadPool();
+
+    static QMutex *functionTestMutex;
+
 private slots:
     void runFunction();
     void createThreadRunFunction();
@@ -92,7 +98,23 @@ private slots:
     void waitForDoneTimeout();
     void destroyingWaitsForTasksToFinish();
     void stressTest();
+
+private:
+    QMutex m_functionTestMutex;
 };
+
+
+QMutex *tst_QThreadPool::functionTestMutex = 0;
+
+tst_QThreadPool::tst_QThreadPool()
+{
+    tst_QThreadPool::functionTestMutex = &m_functionTestMutex;
+}
+
+tst_QThreadPool::~tst_QThreadPool()
+{
+    tst_QThreadPool::functionTestMutex = 0;
+}
 
 int testFunctionCount;
 
@@ -114,19 +136,19 @@ void noSleepTestFunction()
 
 void sleepTestFunctionMutex()
 {
-    static QMutex testMutex;
+    Q_ASSERT(tst_QThreadPool::functionTestMutex);
     QTest::qSleep(1000);
-    testMutex.lock();
+    tst_QThreadPool::functionTestMutex->lock();
     ++testFunctionCount;
-    testMutex.unlock();
+    tst_QThreadPool::functionTestMutex->unlock();
 }
 
 void noSleepTestFunctionMutex()
 {
-    static QMutex testMutex;
-    testMutex.lock();
+    Q_ASSERT(tst_QThreadPool::functionTestMutex);
+    tst_QThreadPool::functionTestMutex->lock();
     ++testFunctionCount;
-    testMutex.unlock();
+    tst_QThreadPool::functionTestMutex->unlock();
 }
 
 void tst_QThreadPool::runFunction()

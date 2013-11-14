@@ -1815,14 +1815,6 @@ to
 <context>
     <name>QDeclarativeImportDatabase</name>
     <message>
-        <source>cannot load module &quot;%1&quot;: File name case mismatch for &quot;%2&quot;</source>
-        <translation>неможливо завантажити модуль &quot;%1&quot;: Регістр імені файлу не збігається для &quot;%2&quot;</translation>
-    </message>
-    <message>
-        <source>module &quot;%1&quot; definition &quot;%2&quot; not readable</source>
-        <translation>неможливо прочитати визначення &quot;%2&quot; модуля &quot;%1&quot;</translation>
-    </message>
-    <message>
         <source>plugin cannot be loaded for module &quot;%1&quot;: %2</source>
         <translation>неможливо завантажити додаток для модуля &quot;%1&quot;: %2</translation>
     </message>
@@ -1875,8 +1867,8 @@ to
         <translation>не є типом</translation>
     </message>
     <message>
-        <source>File name case mismatch for &quot;%2&quot;</source>
-        <translation>Регістр імені файлу не збігається для &quot;%2&quot;</translation>
+        <source>File name case mismatch for &quot;%1&quot;</source>
+        <translation>Регістр імені файлу не збігається для &quot;%1&quot;</translation>
     </message>
 </context>
 <context>
@@ -3062,6 +3054,13 @@ Do you want to delete it anyway?</source>
     </message>
 </context>
 <context>
+    <name>QGroupBox</name>
+    <message>
+        <source>Toggle</source>
+        <translation>Перемкнути</translation>
+    </message>
+</context>
+<context>
     <name>QHostInfo</name>
     <message>
         <source>No host name given</source>
@@ -3093,6 +3092,10 @@ Do you want to delete it anyway?</source>
     <message>
         <source>Unknown error</source>
         <translation>Невідома помилка</translation>
+    </message>
+    <message>
+        <source>Unknown error (%1)</source>
+        <translation>Невідома помилка (%1)</translation>
     </message>
 </context>
 <context>
@@ -3749,8 +3752,8 @@ Do you want to delete it anyway?</source>
         <translation>&lt;h3&gt;Про Qt&lt;/h3&gt;&lt;p&gt;Ця програма використовує Qt версії %1.&lt;/p&gt;</translation>
     </message>
     <message>
-        <source>&lt;p&gt;Qt is a C++ toolkit for cross-platform application development.&lt;/p&gt;&lt;p&gt;Qt provides single-source portability across MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux, and all major commercial Unix variants. Qt is also available for embedded devices as Qt for Embedded Linux and Qt for Windows CE.&lt;/p&gt;&lt;p&gt;Qt is available under three different licensing options designed to accommodate the needs of our various users.&lt;/p&gt;&lt;p&gt;Qt licensed under our commercial license agreement is appropriate for development of proprietary/commercial software where you do not want to share any source code with third parties or otherwise cannot comply with the terms of the GNU LGPL version 2.1 or GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU LGPL version 2.1 is appropriate for the development of Qt applications (proprietary or open source) provided you can comply with the terms and conditions of the GNU LGPL version 2.1.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU General Public License version 3.0 is appropriate for the development of Qt applications where you wish to use such applications in combination with software subject to the terms of the GNU GPL version 3.0 or where you are otherwise willing to comply with the terms of the GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Please see &lt;a href=&quot;http://qt.nokia.com/products/licensing&quot;&gt;qt.nokia.com/products/licensing&lt;/a&gt; for an overview of Qt licensing.&lt;/p&gt;&lt;p&gt;Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).&lt;/p&gt;&lt;p&gt;Qt is a Nokia product. See &lt;a href=&quot;http://qt.nokia.com/&quot;&gt;qt.nokia.com&lt;/a&gt; for more information.&lt;/p&gt;</source>
-        <translation>&lt;p&gt;Qt - це інструментарій для крос-платформної розробки програм на C++.&lt;/p&gt;&lt;p&gt;Qt надає переносимість єдиного коду між MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux та усіма іншими головними комерційними варіантами Unix. Також, Qt доступна для вбудованих пристроїв у вигляді Qt для Embedded Linux та Qt для Windows CE.&lt;/p&gt;&lt;p&gt;Qt доступна на умовах трьох різних опцій ліцензування з метою задоволення потреб усіх наших різноманітних користувачів.&lt;/p&gt;&lt;p&gt;Qt ліцензована на умовах нашої комерційної ліцензійної угоди придатна для розробки пропієтарного/комерційного програмного забезпечення тоді, коли ви не бажаєте надавати будь-який код чи коли не можете прийняти умови ліцензій GNU LGPL версії 2.1 чи GNU GPL версії 3.0.&lt;/p&gt;&lt;p&gt;Qt ліцензована на умовах GNU LGPL версії 2.1 придатна для розробки програм на базі Qt (пропієтарних або з відкритим кодом) за умови, що ви можете погодитись з вимогами та умовами GNU LGPL версії 2.1.&lt;/p&gt;&lt;p&gt;Qt ліцензована на умовах GNU General Public License версії 3.0 придатна для розробки програм на базі Qt, коли ви бажаєте використовувати такі програми у поєднанні з програмним забезпеченням, що підпадає під вимоги GNU GPL версії 3.0 або коли ви бажаєте дотримуватись вимог GNU GPL версії 3.0.&lt;/p&gt;&lt;p&gt;Будь ласка, перегляньте &lt;a href=&quot;http://qt.nokia.com/products/licensing&quot;&gt;qt.nokia.com/products/licensing&lt;/a&gt; для огляду ліцензування Qt.&lt;/p&gt;&lt;p&gt;Copyright (C) 2012 Корпорація Nokia та/або її дочірні компанії.&lt;/p&gt;&lt;p&gt;Qt - це продукт Nokia. Подивіться &lt;a href=&quot;http://qt.nokia.com/&quot;&gt;qt.nokia.com&lt;/a&gt; для додаткової інформації.&lt;/p&gt;</translation>
+        <source>&lt;p&gt;Qt is a C++ toolkit for cross-platform application development.&lt;/p&gt;&lt;p&gt;Qt provides single-source portability across MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux, and all major commercial Unix variants. Qt is also available for embedded devices as Qt for Embedded Linux and Qt for Windows CE.&lt;/p&gt;&lt;p&gt;Qt is available under three different licensing options designed to accommodate the needs of our various users.&lt;/p&gt;&lt;p&gt;Qt licensed under our commercial license agreement is appropriate for development of proprietary/commercial software where you do not want to share any source code with third parties or otherwise cannot comply with the terms of the GNU LGPL version 2.1 or GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU LGPL version 2.1 is appropriate for the development of Qt applications (proprietary or open source) provided you can comply with the terms and conditions of the GNU LGPL version 2.1.&lt;/p&gt;&lt;p&gt;Qt licensed under the GNU General Public License version 3.0 is appropriate for the development of Qt applications where you wish to use such applications in combination with software subject to the terms of the GNU GPL version 3.0 or where you are otherwise willing to comply with the terms of the GNU GPL version 3.0.&lt;/p&gt;&lt;p&gt;Please see &lt;a href=&quot;http://qt.digia.com/product/licensing&quot;&gt;qt.digia.com/product/licensing&lt;/a&gt; for an overview of Qt licensing.&lt;/p&gt;&lt;p&gt;Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).&lt;/p&gt;&lt;p&gt;Qt is a Digia product. See &lt;a href=&quot;http://qt.digia.com/&quot;&gt;qt.digia.com&lt;/a&gt; for more information.&lt;/p&gt;</source>
+        <translation>&lt;p&gt;Qt - це інструментарій для крос-платформної розробки програм на C++.&lt;/p&gt;&lt;p&gt;Qt надає переносимість єдиного коду між MS&amp;nbsp;Windows, Mac&amp;nbsp;OS&amp;nbsp;X, Linux та усіма іншими головними комерційними варіантами Unix. Також, Qt доступна для вбудованих пристроїв у вигляді Qt для Embedded Linux та Qt для Windows CE.&lt;/p&gt;&lt;p&gt;Qt доступна на умовах трьох різних опцій ліцензування з метою задоволення потреб усіх наших різноманітних користувачів.&lt;/p&gt;&lt;p&gt;Qt ліцензована на умовах нашої комерційної ліцензійної угоди придатна для розробки пропієтарного/комерційного програмного забезпечення тоді, коли ви не бажаєте надавати будь-який код чи коли не можете прийняти умови ліцензій GNU LGPL версії 2.1 чи GNU GPL версії 3.0.&lt;/p&gt;&lt;p&gt;Qt ліцензована на умовах GNU LGPL версії 2.1 придатна для розробки програм на базі Qt (пропієтарних або з відкритим кодом) за умови, що ви можете погодитись з вимогами та умовами GNU LGPL версії 2.1.&lt;/p&gt;&lt;p&gt;Qt ліцензована на умовах GNU General Public License версії 3.0 придатна для розробки програм на базі Qt, коли ви бажаєте використовувати такі програми у поєднанні з програмним забезпеченням, що підпадає під вимоги GNU GPL версії 3.0 або коли ви бажаєте дотримуватись вимог GNU GPL версії 3.0.&lt;/p&gt;&lt;p&gt;Будь ласка, перегляньте &lt;a href=&quot;http://qt.digia.com/product/licensing&quot;&gt;qt.digia.com/product/licensing&lt;/a&gt; для огляду ліцензування Qt.&lt;/p&gt;&lt;p&gt;Copyright (C) 2013 Digia Plc та/або її дочірні компанії.&lt;/p&gt;&lt;p&gt;Qt - це продукт Digia. Подивіться &lt;a href=&quot;http://qt.digia.com/&quot;&gt;qt.digia.com&lt;/a&gt; для додаткової інформації.&lt;/p&gt;</translation>
     </message>
     <message>
         <source>About Qt</source>
@@ -4185,6 +4188,46 @@ Do you want to delete it anyway?</source>
     <message>
         <source>Host not found</source>
         <translation>Вузол не знайдено</translation>
+    </message>
+    <message>
+        <source>Could not read image data</source>
+        <translation>Не вдалося прочитати дані зображення</translation>
+    </message>
+    <message>
+        <source>Sequential device (eg socket) for image read not supported</source>
+        <translation>Не підтримується читання зображень з послідовних пристроїв (наприклад, сокетів)</translation>
+    </message>
+    <message>
+        <source>Seek file/device for image read failed</source>
+        <translation>Збій переміщення файлу/пристрою при читанні зображення</translation>
+    </message>
+    <message>
+        <source>Image mHeader read failed</source>
+        <translation>Збій читання mHeader зображення</translation>
+    </message>
+    <message>
+        <source>Image type not supported</source>
+        <translation>Тип зображення не підтримується</translation>
+    </message>
+    <message>
+        <source>Image depth not valid</source>
+        <translation>Неправильна глибина кольору зображення</translation>
+    </message>
+    <message>
+        <source>Could not seek to image read footer</source>
+        <translation>Не вдалось переміститись до кінцівки зображення</translation>
+    </message>
+    <message>
+        <source>Could not read footer</source>
+        <translation>Не вдалося прочитати кінцівку</translation>
+    </message>
+    <message>
+        <source>Image type (non-TrueVision 2.0) not supported</source>
+        <translation>Тип зображення (відмінний від TrueVision 2.0) не підтримується</translation>
+    </message>
+    <message>
+        <source>Could not reset to start position</source>
+        <translation>Не вдалося скинути до початкової позиції</translation>
     </message>
 </context>
 <context>
@@ -4978,6 +5021,10 @@ Do you want to overwrite it?</source>
         <translation>неправильний синтаксис &quot;lookahead&quot;</translation>
     </message>
     <message>
+        <source>lookbehinds not supported, see QTBUG-2371</source>
+        <translation>lookbehinds не підтримується, див. QTBUG-2371</translation>
+    </message>
+    <message>
         <source>bad repetition syntax</source>
         <translation>неправильний синтаксис повторення</translation>
     </message>
@@ -5072,6 +5119,10 @@ Do you want to overwrite it?</source>
     <message>
         <source>Unable to execute statement</source>
         <translation>Неможливо виконати вираз</translation>
+    </message>
+    <message>
+        <source>Unable to execute multiple statements at a time</source>
+        <translation>Неможливо виконати декілька виразів водночас</translation>
     </message>
     <message>
         <source>Unable to reset statement</source>
@@ -6949,6 +7000,26 @@ Do you want to overwrite it?</source>
     <message>
         <source>Scroll Right</source>
         <translation>Прокрутити вправо</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Закрити</translation>
+    </message>
+    <message>
+        <source>Activate</source>
+        <translation>Активувати</translation>
+    </message>
+    <message>
+        <source>Press</source>
+        <translation>Натиснути</translation>
+    </message>
+    <message>
+        <source>Close the tab</source>
+        <translation>Закрити вкладку</translation>
+    </message>
+    <message>
+        <source>Activate the tab</source>
+        <translation>Активувати вкладку</translation>
     </message>
 </context>
 <context>

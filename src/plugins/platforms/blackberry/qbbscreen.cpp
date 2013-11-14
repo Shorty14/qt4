@@ -1,36 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 - 2012 Research In Motion
-**
-** Contact: Research In Motion <blackberry-qt@qnx.com>
-** Contact: Klarälvdalens Datakonsult AB <info@kdab.com>
+** Copyright (C) 2011 - 2012 Research In Motion <blackberry-qt@qnx.com>
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -40,29 +42,78 @@
 // #define QBBSCREEN_DEBUG
 
 #include "qbbscreen.h"
-#include "qbbvirtualkeyboard.h"
 #include "qbbrootwindow.h"
 #include "qbbwindow.h"
+#include "qbbcursor.h"
 
-#include <QUuid>
 #include <QDebug>
+#include <QtCore/QThread>
+#include <QtGui/QWindowSystemInterface>
 
 #include <errno.h>
 #include <unistd.h>
 
 QT_BEGIN_NAMESPACE
 
-#define MAGIC_ZORDER_FOR_NO_NAV     10
+#if defined(QBB_PHYSICAL_SCREEN_WIDTH) && QBB_PHYSICAL_SCREEN_WIDTH > 0 \
+    && defined(QBB_PHYSICAL_SCREEN_HEIGHT) && QBB_PHYSICAL_SCREEN_HEIGHT > 0
+#define QBB_PHYSICAL_SCREEN_SIZE_DEFINED
+#elif defined(QBB_PHYSICAL_SCREEN_WIDTH) || defined(QBB_PHYSICAL_SCREEN_HEIGHT)
+#error Please define QBB_PHYSICAL_SCREEN_WIDTH and QBB_PHYSICAL_SCREEN_HEIGHT to values greater than zero
+#endif
 
-QList<QPlatformScreen *> QBBScreen::sScreens;
-QList<QBBWindow*> QBBScreen::sChildren;
+QT_BEGIN_NAMESPACE
 
-QBBScreen::QBBScreen(screen_context_t context, screen_display_t display, bool primary)
+static QSize determineScreenSize(screen_display_t display, bool primaryScreen)
+{
+    int val[2];
+
+    errno = 0;
+    const int result = screen_get_display_property_iv(display, SCREEN_PROPERTY_PHYSICAL_SIZE, val);
+    if (result != 0) {
+        qFatal("QBBScreen: failed to query display physical size, errno=%d", errno);
+        return QSize(150, 90);
+    }
+
+    if (val[0] > 0 && val[1] > 0)
+        return QSize(val[0], val[1]);
+
+    qWarning("QBBScreen: screen_get_display_property_iv() reported an invalid physical screen size (%dx%d). Falling back to QBB_PHYSICAL_SCREEN_SIZE environment variable.", val[0], val[1]);
+
+    const QString envPhySizeStr = qgetenv("QBB_PHYSICAL_SCREEN_SIZE");
+    if (!envPhySizeStr.isEmpty()) {
+        const QStringList envPhySizeStrList = envPhySizeStr.split(QLatin1Char(','));
+        const int envWidth = envPhySizeStrList.size() == 2 ? envPhySizeStrList[0].toInt() : -1;
+        const int envHeight = envPhySizeStrList.size() == 2 ? envPhySizeStrList[1].toInt() : -1;
+
+        if (envWidth <= 0 || envHeight <= 0) {
+            qFatal("QBBScreen: The value of QBB_PHYSICAL_SCREEN_SIZE must be in the format \"width,height\" in mm, with width, height > 0. Example: QBB_PHYSICAL_SCREEN_SIZE=150,90");
+            return QSize(150, 90);
+        }
+
+        return QSize(envWidth, envHeight);
+    }
+
+#if defined(QBB_PHYSICAL_SCREEN_SIZE_DEFINED)
+    const QSize defSize(QBB_PHYSICAL_SCREEN_WIDTH, QBB_PHYSICAL_SCREEN_HEIGHT);
+    qWarning("QBBScreen: QBB_PHYSICAL_SCREEN_SIZE variable not set. Falling back to defines QBB_PHYSICAL_SCREEN_WIDTH/QBB_PHYSICAL_SCREEN_HEIGHT (%dx%d)", defSize.width(), defSize.height());
+    return defSize;
+#else
+    if (primaryScreen)
+        qFatal("QBBScreen: QBB_PHYSICAL_SCREEN_SIZE variable not set. Could not determine physical screen size.");
+    return QSize(150, 90);
+#endif
+}
+
+QBBScreen::QBBScreen(screen_context_t context, screen_display_t display, int screenIndex)
     : mContext(context),
       mDisplay(display),
       mPosted(false),
       mUsingOpenGL(false),
-      mPrimaryDisplay(primary)
+      mPrimaryDisplay(screenIndex == 0),
+      mKeyboardHeight(0),
+      mScreenIndex(screenIndex),
+      mCursor(new QBBCursor(this))
 {
 #if defined(QBBSCREEN_DEBUG)
     qDebug() << "QBBScreen::QBBScreen";
@@ -89,23 +140,14 @@ QBBScreen::QBBScreen(screen_context_t context, screen_display_t display, bool pr
 
     mCurrentGeometry = mStartGeometry = QRect(0, 0, val[0], val[1]);
 
-    // cache size of this display in millimeters
-    errno = 0;
-    result = screen_get_display_property_iv(mDisplay, SCREEN_PROPERTY_PHYSICAL_SIZE, val);
-    if (result != 0) {
-        qFatal("QBBScreen: failed to query display physical size, errno=%d", errno);
-    }
+    // Cache size of this display in millimeters
+    mStartPhysicalSize = determineScreenSize(mDisplay, mPrimaryDisplay);
 
-    // Peg the DPI to 96 (for now) so fonts are a reasonable size. We'll want to match
-    // everything with a QStyle later, and at that point the physical size can be used
-    // instead.
-    {
-        static const int dpi = 96;
-        int width = mCurrentGeometry.width() / dpi * qreal(25.4) ;
-        int height = mCurrentGeometry.height() / dpi * qreal(25.4) ;
+    // swap physical dimensions when rotated orthogonally
+    if (mStartRotation == 90 || mStartRotation == 270)
+        mStartPhysicalSize.transpose();
 
-        mCurrentPhysicalSize = mStartPhysicalSize = QSize(width,height);
-    }
+    mCurrentPhysicalSize = mStartPhysicalSize;
 
     // We only create the root window if we are not the primary display.
     if (mPrimaryDisplay)
@@ -119,48 +161,7 @@ QBBScreen::~QBBScreen()
 #endif
 }
 
-/* static */
-void QBBScreen::createDisplays(screen_context_t context)
-{
-    // get number of displays
-    errno = 0;
-    int displayCount;
-    int result = screen_get_context_property_iv(context, SCREEN_PROPERTY_DISPLAY_COUNT, &displayCount);
-    if (result != 0) {
-        qFatal("QBBScreen: failed to query display count, errno=%d", errno);
-    }
-
-    // get all displays
-    errno = 0;
-    screen_display_t *displays = (screen_display_t *)alloca(sizeof(screen_display_t) * displayCount);
-    result = screen_get_context_property_pv(context, SCREEN_PROPERTY_DISPLAYS, (void **)displays);
-    if (result != 0) {
-        qFatal("QBBScreen: failed to query displays, errno=%d", errno);
-    }
-
-    for (int i=0; i<displayCount; i++) {
-#if defined(QBBSCREEN_DEBUG)
-        qDebug() << "QBBScreen::Creating screen for display " << i;
-#endif
-        QBBScreen *screen = new QBBScreen(context, displays[i], i==0);
-        sScreens.push_back(screen);
-    }
-}
-
-/* static */
-void QBBScreen::destroyDisplays()
-{
-    while (sScreens.length()) {
-        delete sScreens.front();
-        sScreens.pop_front();
-    }
-
-    // We're not managing the child windows anymore so we need to clear the list.
-    sChildren.clear();
-}
-
-/* static */
-int QBBScreen::defaultDepth()
+static int defaultDepth()
 {
     static int defaultDepth = 0;
     if (defaultDepth == 0) {
@@ -180,12 +181,41 @@ void QBBScreen::ensureDisplayCreated()
         mRootWindow = QSharedPointer<QBBRootWindow>(new QBBRootWindow(this));
 }
 
+void QBBScreen::newWindowCreated(screen_window_t window)
+{
+    Q_ASSERT(thread() == QThread::currentThread());
+    screen_display_t display = 0;
+    if (screen_get_window_property_pv(window, SCREEN_PROPERTY_DISPLAY, (void**)&display) != 0) {
+        qWarning("QBBScreen: Failed to get screen for window, errno=%d", errno);
+        return;
+    }
+
+    if (display == nativeDisplay()) {
+        // A window was created on this screen. If we don't know about this window yet, it means
+        // it was not created by Qt, but by some foreign library like the multimedia renderer, which
+        // creates an overlay window when playing a video.
+        // Treat all foreign windows as overlays here.
+        if (!findWindow(window))
+            addOverlayWindow(window);
+    }
+}
+
+void QBBScreen::windowClosed(screen_window_t window)
+{
+    Q_ASSERT(thread() == QThread::currentThread());
+    removeOverlayWindow(window);
+}
+
 QRect QBBScreen::availableGeometry() const
 {
     // available geometry = total geometry - keyboard
-    int keyboardHeight = QBBVirtualKeyboard::instance().getHeight();
     return QRect(mCurrentGeometry.x(), mCurrentGeometry.y(),
-                 mCurrentGeometry.width(), mCurrentGeometry.height() - keyboardHeight);
+                 mCurrentGeometry.width(), mCurrentGeometry.height() - mKeyboardHeight);
+}
+
+int QBBScreen::depth() const
+{
+    return defaultDepth();
 }
 
 /*!
@@ -208,6 +238,8 @@ void QBBScreen::setRotation(int rotation)
         if (mRootWindow)
             mRootWindow->setRotation(rotation);
 
+        const QRect previousScreenGeometry = geometry();
+
         // swap dimensions if we've rotated 90 or 270 from initial orientation
         if (isOrthogonal(mStartRotation, rotation)) {
             mCurrentGeometry = QRect(0, 0, mStartGeometry.height(), mStartGeometry.width());
@@ -225,6 +257,9 @@ void QBBScreen::setRotation(int rotation)
 #endif
             if (mRootWindow)
                 mRootWindow->resize(mCurrentGeometry.size());
+
+            if (mPrimaryDisplay)
+                resizeWindows(previousScreenGeometry);
         } else {
             // TODO: find one global place to flush display updates
 #if defined(QBBSCREEN_DEBUG)
@@ -237,7 +272,129 @@ void QBBScreen::setRotation(int rotation)
 
         // save new rotation
         mCurrentRotation = rotation;
+
+        // TODO: check if other screens are supposed to rotate as well and/or whether this depends
+        // on if clone mode is being used.
+        // Rotating only the primary screen is what we had in the navigator event handler before refactoring
+        if (mPrimaryDisplay)
+            QWindowSystemInterface::handleScreenGeometryChange(mScreenIndex);
+
+        // Flush everything, so that the windows rotations are applied properly.
+        // Needed for non-maximized windows
+        screen_flush_context(mContext, 0);
     }
+}
+
+void QBBScreen::resizeNativeWidgetWindow(QBBWindow *w, const QRect &previousScreenGeometry) const
+{
+    const qreal relativeX = static_cast<qreal>(w->geometry().topLeft().x()) / previousScreenGeometry.width();
+    const qreal relativeY = static_cast<qreal>(w->geometry().topLeft().y()) / previousScreenGeometry.height();
+    const qreal relativeWidth = static_cast<qreal>(w->geometry().width()) / previousScreenGeometry.width();
+    const qreal relativeHeight = static_cast<qreal>(w->geometry().height()) / previousScreenGeometry.height();
+
+    const QRect windowGeometry(relativeX * geometry().width(), relativeY * geometry().height(),
+            relativeWidth * geometry().width(), relativeHeight * geometry().height());
+
+    w->widget()->setGeometry(windowGeometry);
+}
+
+/*!
+  Resize the given window to fit the screen geometry
+*/
+void QBBScreen::resizeTopLevelWindow(QBBWindow *w, const QRect &previousScreenGeometry) const
+{
+    QRect windowGeometry = w->geometry();
+
+    const qreal relativeCenterX = static_cast<qreal>(w->geometry().center().x()) / previousScreenGeometry.width();
+    const qreal relativeCenterY = static_cast<qreal>(w->geometry().center().y()) / previousScreenGeometry.height();
+    const QPoint newCenter(relativeCenterX * geometry().width(), relativeCenterY * geometry().height());
+
+    windowGeometry.moveCenter(newCenter);
+
+    // adjust center position in case the window
+    // is clipped
+    if (!geometry().contains(windowGeometry)) {
+        const int x1 = windowGeometry.x();
+        const int y1 = windowGeometry.y();
+        const int x2 = x1 + windowGeometry.width();
+        const int y2 = y1 + windowGeometry.height();
+
+        if (x1 < 0) {
+            const int centerX = qMin(qAbs(x1) + windowGeometry.center().x(),
+                                        geometry().center().x());
+
+            windowGeometry.moveCenter(QPoint(centerX, windowGeometry.center().y()));
+        }
+
+        if (y1 < 0) {
+            const int centerY = qMin(qAbs(y1) + windowGeometry.center().y(),
+                                        geometry().center().y());
+
+            windowGeometry.moveCenter(QPoint(windowGeometry.center().x(), centerY));
+        }
+
+        if (x2 > geometry().width()) {
+            const int centerX = qMax(windowGeometry.center().x() - (x2 - geometry().width()),
+                                        geometry().center().x());
+
+            windowGeometry.moveCenter(QPoint(centerX, windowGeometry.center().y()));
+        }
+
+        if (y2 > geometry().height()) {
+            const int centerY = qMax(windowGeometry.center().y() - (y2 - geometry().height()),
+                                        geometry().center().y());
+
+            windowGeometry.moveCenter(QPoint(windowGeometry.center().x(), centerY));
+        }
+    }
+
+    // at this point, if the window is still clipped,
+    // it means that it's too big to fit on the screen,
+    // so we need to proportionally shrink it
+    if (!geometry().contains(windowGeometry)) {
+        QSize newSize = windowGeometry.size();
+        newSize.scale(geometry().size(), Qt::KeepAspectRatio);
+        windowGeometry.setSize(newSize);
+
+        if (windowGeometry.x() < 0)
+            windowGeometry.moveCenter(QPoint(geometry().center().x(), windowGeometry.center().y()));
+
+        if (windowGeometry.y() < 0)
+            windowGeometry.moveCenter(QPoint(windowGeometry.center().x(), geometry().center().y()));
+    }
+
+    w->widget()->setGeometry(windowGeometry);
+}
+
+/*!
+  Adjust windows to the new screen geometry.
+*/
+void QBBScreen::resizeWindows(const QRect &previousScreenGeometry)
+{
+    Q_FOREACH (QBBWindow *w, mChildren) {
+
+        if (w->widget()->windowState() & Qt::WindowFullScreen || w->widget()->windowState() & Qt::WindowMaximized)
+            continue;
+
+        if (w->widget()->parent()) {
+            // This is a native (non-alien) widget window
+            resizeNativeWidgetWindow(w, previousScreenGeometry);
+        } else {
+            // This is a toplevel window
+            resizeTopLevelWindow(w, previousScreenGeometry);
+        }
+    }
+}
+
+QBBWindow *QBBScreen::findWindow(screen_window_t windowHandle)
+{
+    Q_FOREACH (QBBWindow *window, mChildren) {
+        QBBWindow * const result = window->findWindow(windowHandle);
+        if (result)
+            return result;
+    }
+
+    return 0;
 }
 
 void QBBScreen::addWindow(QBBWindow* window)
@@ -246,11 +403,21 @@ void QBBScreen::addWindow(QBBWindow* window)
     qDebug() << "QBBScreen::addWindow=" << window;
 #endif
 
-    if (sChildren.contains(window))
+    if (mChildren.contains(window))
         return;
 
-    sChildren.push_back(window);
-    QBBScreen::updateHierarchy();
+    // Ensure that the desktop window is at the bottom of the zorder.
+    // If we do not do this then we may end up activating the desktop
+    // when the navigator service gets an event that our window group
+    // has been activated (see QBBScreen::activateWindowGroup()).
+    // Such a situation would strangely break focus handling due to the
+    // invisible desktop widget window being layered on top of normal
+    // windows
+    if (window->widget()->windowType() == Qt::Desktop)
+        mChildren.push_front(window);
+    else
+        mChildren.push_back(window);
+    updateHierarchy();
 }
 
 void QBBScreen::removeWindow(QBBWindow* window)
@@ -259,8 +426,9 @@ void QBBScreen::removeWindow(QBBWindow* window)
     qDebug() << "QBBScreen::removeWindow=" << window;
 #endif
 
-    sChildren.removeAll(window);
-    QBBScreen::updateHierarchy();
+    const int numWindowsRemoved = mChildren.removeAll(window);
+    if (numWindowsRemoved > 0)
+        updateHierarchy();
 }
 
 void QBBScreen::raiseWindow(QBBWindow* window)
@@ -270,8 +438,8 @@ void QBBScreen::raiseWindow(QBBWindow* window)
 #endif
 
     removeWindow(window);
-    sChildren.push_back(window);
-    QBBScreen::updateHierarchy();
+    mChildren.push_back(window);
+    updateHierarchy();
 }
 
 void QBBScreen::lowerWindow(QBBWindow* window)
@@ -281,8 +449,8 @@ void QBBScreen::lowerWindow(QBBWindow* window)
 #endif
 
     removeWindow(window);
-    sChildren.push_front(window);
-    QBBScreen::updateHierarchy();
+    mChildren.push_front(window);
+    updateHierarchy();
 }
 
 void QBBScreen::updateHierarchy()
@@ -291,22 +459,25 @@ void QBBScreen::updateHierarchy()
     qDebug() << "QBBScreen::updateHierarchy";
 #endif
 
-    QList<QBBWindow*>::iterator it;
-    QList<QPlatformScreen *>::iterator sit;
-    QMap<QPlatformScreen *, int> map;
+    QList<QBBWindow*>::const_iterator it;
     int topZorder = 1; // root window is z-order 0, all "top" level windows are "above" it
 
-    for (sit = sScreens.begin(); sit != sScreens.end(); sit++)
-        map[*sit] = 0;
-
-    for (it = sChildren.begin(); it != sChildren.end(); it++) {
+    for (it = mChildren.constBegin(); it != mChildren.constEnd(); ++it) {
         (*it)->updateZorder(topZorder);
-        map[static_cast<QBBScreen*>((*it)->screen())] = 1;
+    }
+
+    topZorder++;
+    Q_FOREACH (screen_window_t overlay, mOverlays) {
+        // Do nothing when this fails. This can happen if we have stale windows in mOverlays,
+        // which in turn can happen because a window was removed but we didn't get a notification
+        // yet.
+        screen_set_window_property_iv(overlay, SCREEN_PROPERTY_ZORDER, &topZorder);
+        topZorder++;
     }
 
     // After a hierarchy update, we need to force a flush on all screens.
     // Right now, all screens share a context.
-    screen_flush_context( primaryDisplay()->mContext, 0 );
+    screen_flush_context( mContext, 0 );
 }
 
 void QBBScreen::onWindowPost(QBBWindow* window)
@@ -320,6 +491,105 @@ void QBBScreen::onWindowPost(QBBWindow* window)
         mRootWindow->post();
         mPosted = true;
     }
+}
+
+void QBBScreen::adjustOrientation()
+{
+    if (!mPrimaryDisplay)
+        return;
+
+    bool ok = false;
+    const int rotation = qgetenv("ORIENTATION").toInt(&ok);
+
+    if (ok)
+        setRotation(rotation);
+}
+
+QPlatformCursor * QBBScreen::cursor() const
+{
+    return mCursor;
+}
+
+void QBBScreen::keyboardHeightChanged(int height)
+{
+    if (height == mKeyboardHeight)
+        return;
+
+    mKeyboardHeight = height;
+
+    QWindowSystemInterface::handleScreenAvailableGeometryChange(mScreenIndex);
+}
+
+void QBBScreen::addOverlayWindow(screen_window_t window)
+{
+    mOverlays.append(window);
+    updateHierarchy();
+}
+
+void QBBScreen::removeOverlayWindow(screen_window_t window)
+{
+    const int numOverlaysRemoved = mOverlays.removeAll(window);
+    if (numOverlaysRemoved > 0)
+        updateHierarchy();
+}
+
+void QBBScreen::windowGroupStateChanged(const QByteArray &id, Qt::WindowState state)
+{
+#if defined(QBBSCREEN_DEBUG)
+    qDebug() << Q_FUNC_INFO;
+#endif
+
+    if (!rootWindow() || id != rootWindow()->groupName())
+        return;
+
+    QWidget * const window = topMostChildWindow();
+
+    if (!window)
+        return;
+
+    QWindowSystemInterface::handleWindowStateChanged(window, state);
+}
+
+void QBBScreen::activateWindowGroup(const QByteArray &id)
+{
+#if defined(QBBSCREEN_DEBUG)
+    qDebug() << Q_FUNC_INFO;
+#endif
+
+    if (!rootWindow() || id != rootWindow()->groupName())
+        return;
+
+    QWidget * const window = topMostChildWindow();
+
+    if (!window)
+        return;
+
+    QWindowSystemInterface::handleWindowActivated(window);
+}
+
+void QBBScreen::deactivateWindowGroup(const QByteArray &id)
+{
+#if defined(QBBSCREEN_DEBUG)
+    qDebug() << Q_FUNC_INFO;
+#endif
+
+    if (!rootWindow() || id != rootWindow()->groupName())
+        return;
+
+    QWindowSystemInterface::handleWindowActivated(0);
+}
+
+QWidget * QBBScreen::topMostChildWindow() const
+{
+    if (!mChildren.isEmpty()) {
+
+        // We're picking up the last window of the list here
+        // because this list is ordered by stacking order.
+        // Last window is effectively the one on top.
+        return mChildren.last()->widget();
+    }
+
+    return 0;
 }
 
 QT_END_NAMESPACE

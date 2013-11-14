@@ -1,38 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
+** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the tools applications of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-** Other Usage
-** Alternatively, this file may be used in accordance with the terms and
-** conditions contained in a signed written agreement between you and Nokia.
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -43,13 +43,13 @@
 #include <QtDBus>
 #include <QDebug>
 
-#define ORIENTATION_SERVICE "com.nokia.SensorService"
-#define ORIENTATION_PATH "/org/maemo/contextkit/Screen/TopEdge"
-#define CONTEXT_INTERFACE "org.maemo.contextkit.Property"
-#define CONTEXT_CHANGED "ValueChanged"
-#define CONTEXT_SUBSCRIBE "Subscribe"
-#define CONTEXT_UNSUBSCRIBE "Unsubscribe"
-#define CONTEXT_GET "Get"
+#define ORIENTATION_SERVICE QLatin1String("com.nokia.SensorService")
+#define ORIENTATION_PATH QLatin1String("/org/maemo/contextkit/Screen/TopEdge")
+#define CONTEXT_INTERFACE QLatin1String("org.maemo.contextkit.Property")
+#define CONTEXT_CHANGED QLatin1String("ValueChanged")
+#define CONTEXT_SUBSCRIBE QLatin1String("Subscribe")
+#define CONTEXT_UNSUBSCRIBE QLatin1String("Unsubscribe")
+#define CONTEXT_GET QLatin1String("Get")
 
 
 class HarmattanOrientation : public DeviceOrientation
@@ -136,13 +136,13 @@ private Q_SLOTS:
 private:
     static Orientation toOrientation(const QString &nativeOrientation)
     {
-        if (nativeOrientation == "top")
+        if (nativeOrientation == QLatin1String("top"))
             return Landscape;
-        else if (nativeOrientation == "left")
+        else if (nativeOrientation == QLatin1String("left"))
             return Portrait;
-        else if (nativeOrientation == "bottom")
+        else if (nativeOrientation == QLatin1String("bottom"))
             return LandscapeInverted;
-        else if (nativeOrientation == "right")
+        else if (nativeOrientation == QLatin1String("right"))
             return PortraitInverted;
         return UnknownOrientation;
     }

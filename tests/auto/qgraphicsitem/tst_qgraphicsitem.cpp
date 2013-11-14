@@ -1,38 +1,38 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
+** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+** Contact: http://www.qt-project.org/legal
 **
 ** This file is part of the test suite of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** GNU Lesser General Public License Usage
-** This file may be used under the terms of the GNU Lesser General Public
-** License version 2.1 as published by the Free Software Foundation and
-** appearing in the file LICENSE.LGPL included in the packaging of this
-** file. Please review the following information to ensure the GNU Lesser
-** General Public License version 2.1 requirements will be met:
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and Digia.  For licensing terms and
+** conditions see http://qt.digia.com/licensing.  For further information
+** use the contact form at http://qt.digia.com/contact-us.
 **
-** In addition, as a special exception, Nokia gives you certain additional
-** rights. These rights are described in the Nokia Qt LGPL Exception
+** GNU Lesser General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU Lesser
+** General Public License version 2.1 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU Lesser General Public License version 2.1 requirements
+** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+**
+** In addition, as a special exception, Digia gives you certain additional
+** rights.  These rights are described in the Digia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
 ** GNU General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU General
-** Public License version 3.0 as published by the Free Software Foundation
-** and appearing in the file LICENSE.GPL included in the packaging of this
-** file. Please review the following information to ensure the GNU General
-** Public License version 3.0 requirements will be met:
-** http://www.gnu.org/copyleft/gpl.html.
-**
-** Other Usage
-** Alternatively, this file may be used in accordance with the terms and
-** conditions contained in a signed written agreement between you and Nokia.
-**
-**
-**
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3.0 as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL included in the
+** packaging of this file.  Please review the following information to
+** ensure the GNU General Public License version 3.0 requirements will be
+** met: http://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -436,6 +436,7 @@ private slots:
     void ensureDirtySceneTransform();
     void focusScope();
     void focusScope2();
+    void focusScopeItemChangedWhileScopeDoesntHaveFocus();
     void stackBefore();
     void sceneModality();
     void panelModality();
@@ -477,6 +478,7 @@ private slots:
     void QTBUG_13473_sceneposchange();
     void QTBUG_16374_crashInDestructor();
     void QTBUG_20699_focusScopeCrash();
+    void QTBUG_30990_rightClickSelection();
 
 private:
     QList<QGraphicsItem *> paintedItems;
@@ -9220,6 +9222,45 @@ void tst_QGraphicsItem::focusScope()
     scope3->setFocus();
     QVERIFY(scope3->hasFocus());
 
+    // clearFocus() on a focus scope will remove focus from its children.
+    scope1->clearFocus();
+    QVERIFY(!scope1->hasFocus());
+    QVERIFY(!scope2->hasFocus());
+    QVERIFY(!scope3->hasFocus());
+
+    scope1->setFocus();
+    QVERIFY(!scope1->hasFocus());
+    QVERIFY(!scope2->hasFocus());
+    QVERIFY(scope3->hasFocus());
+
+    scope2->clearFocus();
+    QVERIFY(scope1->hasFocus());
+    QVERIFY(!scope2->hasFocus());
+    QVERIFY(!scope3->hasFocus());
+
+    scope2->setFocus();
+    QVERIFY(!scope1->hasFocus());
+    QVERIFY(!scope2->hasFocus());
+    QVERIFY(scope3->hasFocus());
+
+    // Focus cleared while a parent doesn't have focus remains cleared
+    // when the parent regains focus.
+    scope1->clearFocus();
+    scope3->clearFocus();
+    QVERIFY(!scope1->hasFocus());
+    QVERIFY(!scope2->hasFocus());
+    QVERIFY(!scope3->hasFocus());
+
+    scope1->setFocus();
+    QVERIFY(!scope1->hasFocus());
+    QVERIFY(scope2->hasFocus());
+    QVERIFY(!scope3->hasFocus());
+
+    scope3->setFocus();
+    QVERIFY(!scope1->hasFocus());
+    QVERIFY(!scope2->hasFocus());
+    QVERIFY(scope3->hasFocus());
+
     QGraphicsRectItem *rect4 = new QGraphicsRectItem;
     rect4->setData(0, "rect4");
     rect4->setParentItem(scope3);
@@ -9323,6 +9364,62 @@ void tst_QGraphicsItem::focusScope2()
     QVERIFY(siblingChild2->focusItem());
     QCOMPARE(siblingFocusScope->focusScopeItem(), (QGraphicsItem *)siblingChild2);
     QCOMPARE(siblingFocusScope->focusItem(), (QGraphicsItem *)siblingChild2);
+}
+
+class FocusScopeItemPrivate;
+class FocusScopeItem : public QGraphicsItem
+{
+    Q_DECLARE_PRIVATE(FocusScopeItem)
+public:
+    FocusScopeItem(QGraphicsItem *parent = 0);
+    QRectF boundingRect() const { return QRectF(); }
+    void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) { }
+
+    int focusScopeChanged;
+    FocusScopeItemPrivate *d_ptr;
+};
+
+class FocusScopeItemPrivate : QGraphicsItemPrivate
+{
+    Q_DECLARE_PUBLIC(FocusScopeItem)
+public:
+    void focusScopeItemChange(bool)
+    { ++q_func()->focusScopeChanged; }
+};
+
+FocusScopeItem::FocusScopeItem(QGraphicsItem *parent)
+    : QGraphicsItem(*new FocusScopeItemPrivate, parent, 0), focusScopeChanged(0)
+{
+    setFlag(ItemIsFocusable);
+}
+
+void tst_QGraphicsItem::focusScopeItemChangedWhileScopeDoesntHaveFocus()
+{
+    QGraphicsRectItem rect;
+    rect.setFlags(QGraphicsItem::ItemIsFocusScope | QGraphicsItem::ItemIsFocusable);
+
+    FocusScopeItem *child1 = new FocusScopeItem(&rect);
+    FocusScopeItem *child2 = new FocusScopeItem(&rect);
+
+    QCOMPARE(rect.focusScopeItem(), (QGraphicsItem *)0);
+    QCOMPARE(child1->focusScopeChanged, 0);
+    QCOMPARE(child2->focusScopeChanged, 0);
+    child1->setFocus();
+    QCOMPARE(rect.focusScopeItem(), (QGraphicsItem *)child1);
+    QCOMPARE(child1->focusScopeChanged, 1);
+    QCOMPARE(child2->focusScopeChanged, 0);
+    child2->setFocus();
+    QCOMPARE(rect.focusScopeItem(), (QGraphicsItem *)child2);
+    QCOMPARE(child1->focusScopeChanged, 2);
+    QCOMPARE(child2->focusScopeChanged, 1);
+    child1->setFocus();
+    QCOMPARE(rect.focusScopeItem(), (QGraphicsItem *)child1);
+    QCOMPARE(child1->focusScopeChanged, 3);
+    QCOMPARE(child2->focusScopeChanged, 2);
+    child1->clearFocus();
+    QCOMPARE(rect.focusScopeItem(), (QGraphicsItem *)0);
+    QCOMPARE(child1->focusScopeChanged, 4);
+    QCOMPARE(child2->focusScopeChanged, 2);
 }
 
 void tst_QGraphicsItem::stackBefore()
@@ -10516,10 +10613,6 @@ public:
 
 void tst_QGraphicsItem::updateMicroFocus()
 {
-#if defined Q_OS_WIN || defined Q_OS_MAC
-    QSKIP("QTBUG-9578", SkipAll);
-    return;
-#endif
     QGraphicsScene scene;
     QWidget parent;
     QGridLayout layout;
@@ -11403,6 +11496,33 @@ void tst_QGraphicsItem::QTBUG_20699_focusScopeCrash()
     fi->setParentItem(fi2);
     fi->setFocus();
     fs.setFocus();
+}
+
+void tst_QGraphicsItem::QTBUG_30990_rightClickSelection()
+{
+    QGraphicsScene scene;
+    QGraphicsItem *item1 = scene.addRect(10, 10, 10, 10);
+    item1->setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemIsMovable);
+    QGraphicsItem *item2 = scene.addRect(100, 100, 10, 10);
+    item2->setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemIsMovable);
+
+    // right mouse press & release over an item should not make it selected
+    sendMousePress(&scene, item1->boundingRect().center(), Qt::RightButton);
+    QVERIFY(!item1->isSelected());
+    sendMouseRelease(&scene, item1->boundingRect().center(), Qt::RightButton);
+    QVERIFY(!item1->isSelected());
+
+    // right mouse press over one item, moving over another item,
+    // and then releasing should make neither of the items selected
+    sendMousePress(&scene, item1->boundingRect().center(), Qt::RightButton);
+    QVERIFY(!item1->isSelected());
+    QVERIFY(!item2->isSelected());
+    sendMouseMove(&scene, item2->boundingRect().center(), Qt::RightButton);
+    QVERIFY(!item1->isSelected());
+    QVERIFY(!item2->isSelected());
+    sendMouseRelease(&scene, item2->boundingRect().center(), Qt::RightButton);
+    QVERIFY(!item1->isSelected());
+    QVERIFY(!item2->isSelected());
 }
 
 QTEST_MAIN(tst_QGraphicsItem)
