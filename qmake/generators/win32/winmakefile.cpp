@@ -1,35 +1,35 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** All rights reserved.
 ** Contact: Nokia Corporation (qt-info@nokia.com)
 **
 ** This file is part of the qmake application of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
 ** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** This file may be used under the terms of the GNU Lesser General Public
+** License version 2.1 as published by the Free Software Foundation and
+** appearing in the file LICENSE.LGPL included in the packaging of this
+** file. Please review the following information to ensure the GNU Lesser
+** General Public License version 2.1 requirements will be met:
+** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
+** rights. These rights are described in the Nokia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU General
+** Public License version 3.0 as published by the Free Software Foundation
+** and appearing in the file LICENSE.GPL included in the packaging of this
+** file. Please review the following information to ensure the GNU General
+** Public License version 3.0 requirements will be met:
+** http://www.gnu.org/copyleft/gpl.html.
 **
-**
-**
+** Other Usage
+** Alternatively, this file may be used in accordance with the terms and
+** conditions contained in a signed written agreement between you and Nokia.
 **
 **
 **
@@ -650,6 +650,7 @@ void Win32MakefileGenerator::writeStandardParts(QTextStream &t)
     t << "DEF_FILE      = " << varList("DEF_FILE") << endl;
     t << "RES_FILE      = " << varList("RES_FILE") << endl; // Not on mingw, can't see why not though...
     t << "COPY          = " << var("QMAKE_COPY") << endl;
+    t << "SED           = " << var("QMAKE_STREAM_EDITOR") << endl;
     t << "COPY_FILE     = " << var("QMAKE_COPY_FILE") << endl;
     t << "COPY_DIR      = " << var("QMAKE_COPY_DIR") << endl;
     t << "DEL_FILE      = " << var("QMAKE_DEL_FILE") << endl;
@@ -845,9 +846,30 @@ QString Win32MakefileGenerator::defaultInstall(const QString &t)
             QString dst_pc = pkgConfigFileName(false);
             if (!dst_pc.isEmpty()) {
                 dst_pc = filePrefixRoot(root, targetdir + dst_pc);
+                const QString dst_pc_dir = fileInfo(dst_pc).path();
+                if (!dst_pc_dir.isEmpty()) {
+                    if (!ret.isEmpty())
+                        ret += "\n\t";
+                    ret += mkdir_p_asstring(dst_pc_dir, true);
+                }
                 if(!ret.isEmpty())
                     ret += "\n\t";
-                ret += "-$(INSTALL_FILE) \"" + pkgConfigFileName(true) + "\" \"" + dst_pc + "\"";
+                const QString replace_rule("QMAKE_PKGCONFIG_INSTALL_REPLACE");
+                if (project->isEmpty(replace_rule)
+                    || project->isActiveConfig("no_sed_meta_install")
+                    || project->isEmpty("QMAKE_STREAM_EDITOR")) {
+                    ret += "-$(INSTALL_FILE) \"" + pkgConfigFileName(true) + "\" \"" + dst_pc + "\"";
+                } else {
+                    ret += "-$(SED)";
+                    QStringList replace_rules = project->values(replace_rule);
+                    for (int r = 0; r < replace_rules.size(); ++r) {
+                        const QString match = project->first(replace_rules.at(r) + ".match"),
+                                    replace = project->first(replace_rules.at(r) + ".replace");
+                        if (!match.isEmpty() /*&& match != replace*/)
+                            ret += " -e \"s," + match + "," + replace + ",g\"";
+                    }
+                    ret += " \"" + pkgConfigFileName(true) + "\" >\"" + dst_pc + "\"";
+                }
                 if(!uninst.isEmpty())
                     uninst.append("\n\t");
                 uninst.append("-$(DEL_FILE) \"" + dst_pc + "\"");

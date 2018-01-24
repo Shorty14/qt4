@@ -1,35 +1,35 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** All rights reserved.
 ** Contact: Nokia Corporation (qt-info@nokia.com)
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
 ** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** This file may be used under the terms of the GNU Lesser General Public
+** License version 2.1 as published by the Free Software Foundation and
+** appearing in the file LICENSE.LGPL included in the packaging of this
+** file. Please review the following information to ensure the GNU Lesser
+** General Public License version 2.1 requirements will be met:
+** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
+** rights. These rights are described in the Nokia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU General
+** Public License version 3.0 as published by the Free Software Foundation
+** and appearing in the file LICENSE.GPL included in the packaging of this
+** file. Please review the following information to ensure the GNU General
+** Public License version 3.0 requirements will be met:
+** http://www.gnu.org/copyleft/gpl.html.
 **
-**
-**
+** Other Usage
+** Alternatively, this file may be used in accordance with the terms and
+** conditions contained in a signed written agreement between you and Nokia.
 **
 **
 **
@@ -47,6 +47,7 @@
 
 #include "qlist.h"
 #include "qfile.h"
+#include "qvarlengtharray.h"
 #ifndef QT_NO_LIBRARY
 # include "qcoreapplication.h"
 # include "qtextcodecplugin.h"
@@ -213,12 +214,13 @@ QTextCodecCleanup::~QTextCodecCleanup()
     destroying_is_ok = true;
 #endif
 
-    for (QList<QTextCodec *>::const_iterator it = all->constBegin()
-            ; it != all->constEnd(); ++it) {
+    QList<QTextCodec *> *myAll = all;
+    all = 0; // Otherwise the d'tor destroys the iterator
+    for (QList<QTextCodec *>::const_iterator it = myAll->constBegin()
+            ; it != myAll->constEnd(); ++it) {
         delete *it;
     }
-    delete all;
-    all = 0;
+    delete myAll;
     localeMapper = 0;
 
 #ifdef Q_DEBUG_TEXTCODEC
@@ -273,10 +275,7 @@ QString QWindowsLocalCodec::convertToUnicode(const char *chars, int length, Conv
     if (!mb || !mblen)
         return QString();
 
-    const int wclen_auto = 4096;
-    wchar_t wc_auto[wclen_auto];
-    int wclen = wclen_auto;
-    wchar_t *wc = wc_auto;
+    QVarLengthArray<wchar_t, 4096> wc(4096);
     int len;
     QString sp;
     bool prepend = false;
@@ -296,7 +295,7 @@ QString QWindowsLocalCodec::convertToUnicode(const char *chars, int length, Conv
         prev[1] = mb[0];
         remainingChars = 0;
         len = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED,
-                                    prev, 2, wc, wclen);
+                                    prev, 2, wc.data(), wc.size());
         if (len) {
             prepend = true;
             sp.append(QChar(wc[0]));
@@ -307,18 +306,12 @@ QString QWindowsLocalCodec::convertToUnicode(const char *chars, int length, Conv
     }
 
     while (!(len=MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED|MB_ERR_INVALID_CHARS,
-                mb, mblen, wc, wclen))) {
+                mb, mblen, wc.data(), wc.size()))) {
         int r = GetLastError();
         if (r == ERROR_INSUFFICIENT_BUFFER) {
-            if (wc != wc_auto) {
-                qWarning("MultiByteToWideChar: Size changed");
-                break;
-            } else {
-                wclen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED,
+                const int wclen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED,
                                     mb, mblen, 0, 0);
-                wc = new wchar_t[wclen];
-                // and try again...
-            }
+                wc.resize(wclen);
         } else if (r == ERROR_NO_UNICODE_TRANSLATION) {
             //find the last non NULL character
             while (mblen > 1  && !(mb[mblen-1]))
@@ -336,8 +329,10 @@ QString QWindowsLocalCodec::convertToUnicode(const char *chars, int length, Conv
             break;
         }
     }
+
     if (len <= 0)
         return QString();
+
     if (wc[len-1] == 0) // len - 1: we don't want terminator
         --len;
 
@@ -346,9 +341,7 @@ QString QWindowsLocalCodec::convertToUnicode(const char *chars, int length, Conv
         state->state_data[0] = (char)state_data;
         state->remainingChars = remainingChars;
     }
-    QString s((QChar*)wc, len);
-    if (wc != wc_auto)
-        delete [] wc;
+    QString s((QChar*)wc.data(), len);
     if (prepend) {
         return sp+s;
     }
@@ -412,7 +405,7 @@ QString QWindowsLocalCodec::convertToUnicodeCharByChar(const char *chars, int le
         s.append(QChar(ws[i]));
     delete [] ws;
 #endif
-    delete mbcs;
+    delete [] mbcs;
     return s;
 }
 

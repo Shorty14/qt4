@@ -1,35 +1,35 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** All rights reserved.
 ** Contact: Nokia Corporation (qt-info@nokia.com)
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
 ** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** This file may be used under the terms of the GNU Lesser General Public
+** License version 2.1 as published by the Free Software Foundation and
+** appearing in the file LICENSE.LGPL included in the packaging of this
+** file. Please review the following information to ensure the GNU Lesser
+** General Public License version 2.1 requirements will be met:
+** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
+** rights. These rights are described in the Nokia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU General
+** Public License version 3.0 as published by the Free Software Foundation
+** and appearing in the file LICENSE.GPL included in the packaging of this
+** file. Please review the following information to ensure the GNU General
+** Public License version 3.0 requirements will be met:
+** http://www.gnu.org/copyleft/gpl.html.
 **
-**
-**
+** Other Usage
+** Alternatively, this file may be used in accordance with the terms and
+** conditions contained in a signed written agreement between you and Nokia.
 **
 **
 **
@@ -105,6 +105,11 @@ QT_END_NAMESPACE
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef Q_OS_QNX
+#include <spawn.h>
+#include <sys/neutrino.h>
+#endif
+
 
 QT_BEGIN_NAMESPACE
 
@@ -453,7 +458,35 @@ bool QProcessPrivate::createChannel(Channel &channel)
     }
 }
 
-static char **_q_dupEnvironment(const QHash<QByteArray, QByteArray> &environment, int *envc)
+QT_BEGIN_INCLUDE_NAMESPACE
+#if defined(Q_OS_MAC) && !defined(QT_NO_CORESERVICES)
+# include <crt_externs.h>
+# define environ (*_NSGetEnviron())
+#else
+  extern char **environ;
+#endif
+QT_END_INCLUDE_NAMESPACE
+
+QProcessEnvironment QProcessEnvironment::systemEnvironment()
+{
+    QProcessEnvironment env;
+#if !defined(Q_OS_MAC) || !defined(QT_NO_CORESERVICES)
+    const char *entry;
+    for (int count = 0; (entry = environ[count]); ++count) {
+        const char *equal = strchr(entry, '=');
+        if (!equal)
+            continue;
+
+        QByteArray name(entry, equal - entry);
+        QByteArray value(equal + 1);
+        env.d->hash.insert(QProcessEnvironmentPrivate::Key(name),
+                           QProcessEnvironmentPrivate::Value(value));
+    }
+#endif
+    return env;
+}
+
+static char **_q_dupEnvironment(const QProcessEnvironmentPrivate::Hash &environment, int *envc)
 {
     *envc = 0;
     if (environment.isEmpty())
@@ -469,17 +502,17 @@ static char **_q_dupEnvironment(const QHash<QByteArray, QByteArray> &environment
 #endif
     const QByteArray envLibraryPath = qgetenv(libraryPath);
     bool needToAddLibraryPath = !envLibraryPath.isEmpty() &&
-                                !environment.contains(libraryPath);
+                                !environment.contains(QProcessEnvironmentPrivate::Key(QByteArray(libraryPath)));
 
     char **envp = new char *[environment.count() + 2];
     envp[environment.count()] = 0;
     envp[environment.count() + 1] = 0;
 
-    QHash<QByteArray, QByteArray>::ConstIterator it = environment.constBegin();
-    const QHash<QByteArray, QByteArray>::ConstIterator end = environment.constEnd();
+    QProcessEnvironmentPrivate::Hash::ConstIterator it = environment.constBegin();
+    const QProcessEnvironmentPrivate::Hash::ConstIterator end = environment.constEnd();
     for ( ; it != end; ++it) {
-        QByteArray key = it.key();
-        QByteArray value = it.value();
+        QByteArray key = it.key().key;
+        QByteArray value = it.value().bytes();
         key.reserve(key.length() + 1 + value.length());
         key.append('=');
         key.append(value);
@@ -491,16 +524,6 @@ static char **_q_dupEnvironment(const QHash<QByteArray, QByteArray> &environment
         envp[(*envc)++] = ::strdup(QByteArray(QByteArray(libraryPath) + '=' +
                                  envLibraryPath).constData());
     return envp;
-}
-
-// under QNX RTOS we have to use vfork() when multithreading
-inline pid_t qt_fork()
-{
-#if defined(Q_OS_QNX)
-    return vfork();
-#else
-    return fork();
-#endif
 }
 
 #ifdef Q_OS_MAC
@@ -530,7 +553,6 @@ void QProcessPrivate::startProcess()
                                                     QSocketNotifier::Read, q);
         QObject::connect(startupSocketNotifier, SIGNAL(activated(int)),
                          q, SLOT(_q_startupNotification()));
-
         deathNotifier = new QSocketNotifier(deathPipe[0],
                                             QSocketNotifier::Read, q);
         QObject::connect(deathNotifier, SIGNAL(activated(int)),
@@ -622,8 +644,12 @@ void QProcessPrivate::startProcess()
 
     // Start the process manager, and fork off the child process.
     processManager()->lock();
-    pid_t childPid = qt_fork();
+#if defined(Q_OS_QNX)
+    pid_t childPid = spawnChild(workingDirPtr, argv, envp);
+#else
+    pid_t childPid = fork();
     int lastForkErrno = errno;
+#endif
     if (childPid != 0) {
         // Clean up duplicated memory.
         free(dupProgramName);
@@ -637,10 +663,22 @@ void QProcessPrivate::startProcess()
         delete [] envp;
         delete [] path;
     }
+
+    // This is not a valid check under QNX, because the semantics are
+    // different. While under other platforms where fork() may succeed and exec() can still fail,
+    // causing the childPid to hold a valid value (and thus evaluating the
+    // following if to false), and then signaling the error via
+    // childStartedPipe, under QNX on the other hand, spawn() return value will be assigned
+    // to childPid (which will be -1 in case of failure). This will force
+    // QProcess to cleanup, instead of signaling the error via
+    // childStartedPipe. Since it will invalidade the pipes, functions like
+    // QProcess::waitForStarted() will fail, for childStartedPipe will be
+    // '-1' and mess with the select() calls.
+#if !defined(Q_OS_QNX)
     if (childPid < 0) {
         // Cleanup, report error and return
 #if defined (QPROCESS_DEBUG)
-        qDebug("qt_fork failed: %s", qPrintable(qt_error_string(lastForkErrno)));
+        qDebug("fork() failed: %s", qPrintable(qt_error_string(lastForkErrno)));
 #endif
         processManager()->unlock();
         q->setProcessState(QProcess::NotRunning);
@@ -656,6 +694,7 @@ void QProcessPrivate::startProcess()
         execChild(workingDirPtr, path, argv, envp);
         ::_exit(-1);
     }
+#endif
 
     // Register the child. In the mean time, we can get a SIGCHLD, so we need
     // to keep the lock held to avoid a race to catch the child.
@@ -673,7 +712,6 @@ void QProcessPrivate::startProcess()
         qt_safe_close(stdinChannel.pipe[0]);
         stdinChannel.pipe[0] = -1;
     }
-
     if (stdinChannel.pipe[1] != -1)
         ::fcntl(stdinChannel.pipe[1], F_SETFL, ::fcntl(stdinChannel.pipe[1], F_GETFL) | O_NONBLOCK);
 
@@ -681,7 +719,6 @@ void QProcessPrivate::startProcess()
         qt_safe_close(stdoutChannel.pipe[1]);
         stdoutChannel.pipe[1] = -1;
     }
-
     if (stdoutChannel.pipe[0] != -1)
         ::fcntl(stdoutChannel.pipe[0], F_SETFL, ::fcntl(stdoutChannel.pipe[0], F_GETFL) | O_NONBLOCK);
 
@@ -693,6 +730,7 @@ void QProcessPrivate::startProcess()
         ::fcntl(stderrChannel.pipe[0], F_SETFL, ::fcntl(stderrChannel.pipe[0], F_GETFL) | O_NONBLOCK);
 }
 
+#if !defined(Q_OS_QNX)
 void QProcessPrivate::execChild(const char *workingDir, char **path, char **argv, char **envp)
 {
     ::signal(SIGPIPE, SIG_DFL);         // reset the signal that we ignored
@@ -700,17 +738,17 @@ void QProcessPrivate::execChild(const char *workingDir, char **path, char **argv
     Q_Q(QProcess);
 
     // copy the stdin socket (without closing on exec)
-    qt_safe_dup2(stdinChannel.pipe[0], fileno(stdin), 0);
+    qt_safe_dup2(stdinChannel.pipe[0], QT_FILENO(stdin), 0);
 
     // copy the stdout and stderr if asked to
     if (processChannelMode != QProcess::ForwardedChannels) {
-        qt_safe_dup2(stdoutChannel.pipe[1], fileno(stdout), 0);
+        qt_safe_dup2(stdoutChannel.pipe[1], QT_FILENO(stdout), 0);
 
         // merge stdout and stderr if asked to
         if (processChannelMode == QProcess::MergedChannels) {
-            qt_safe_dup2(fileno(stdout), fileno(stderr), 0);
+            qt_safe_dup2(QT_FILENO(stdout), QT_FILENO(stderr), 0);
         } else {
-            qt_safe_dup2(stderrChannel.pipe[1], fileno(stderr), 0);
+            qt_safe_dup2(stderrChannel.pipe[1], QT_FILENO(stderr), 0);
         }
     }
 
@@ -756,6 +794,8 @@ void QProcessPrivate::execChild(const char *workingDir, char **path, char **argv
     childStartedPipe[1] = -1;
 }
 
+#endif //Q_OS_QNX
+
 bool QProcessPrivate::processStarted()
 {
     ushort buf[errorBufferMax];
@@ -778,6 +818,86 @@ bool QProcessPrivate::processStarted()
 
     return i <= 0;
 }
+
+#if defined(Q_OS_QNX)
+static pid_t doSpawn(int fd_count, int fd_map[], char **argv, char **envp,
+        const char *workingDir, bool spawn_detached)
+{
+    // A multi threaded QNX Process can't fork so we call spawn() instead.
+
+    struct inheritance inherit;
+    memset(&inherit, 0, sizeof(inherit));
+    inherit.flags |= SPAWN_SETSID;
+    inherit.flags |= SPAWN_CHECK_SCRIPT;
+    if (spawn_detached)
+        inherit.flags |= SPAWN_NOZOMBIE;
+    inherit.flags |= SPAWN_SETSIGDEF;
+    sigaddset(&inherit.sigdefault, SIGPIPE); // reset the signal that we ignored
+
+    // enter the working directory
+    const char *oldWorkingDir = 0;
+    char buff[PATH_MAX + 1];
+
+    if (workingDir) {
+        //we need to freeze everyone in order to avoid race conditions with //chdir().
+        if (ThreadCtl(_NTO_TCTL_THREADS_HOLD, 0) == -1)
+            qWarning("ThreadCtl(): cannot hold threads: %s", qPrintable(qt_error_string(errno)));
+
+        oldWorkingDir = QT_GETCWD(buff, PATH_MAX + 1);
+        QT_CHDIR(workingDir);
+    }
+
+    pid_t childPid;
+    EINTR_LOOP(childPid, ::spawn(argv[0], fd_count, fd_map, &inherit, argv, envp));
+    if (childPid == -1) {
+        inherit.flags |= SPAWN_SEARCH_PATH;
+        EINTR_LOOP(childPid, ::spawn(argv[0], fd_count, fd_map, &inherit, argv, envp));
+    }
+
+    if (oldWorkingDir) {
+        QT_CHDIR(oldWorkingDir);
+
+        if (ThreadCtl(_NTO_TCTL_THREADS_CONT, 0) == -1)
+            qFatal("ThreadCtl(): cannot resume threads: %s", qPrintable(qt_error_string(errno)));
+    }
+
+    return childPid;
+}
+
+pid_t QProcessPrivate::spawnChild(const char *workingDir, char **argv, char **envp)
+{
+    const int fd_count = 3;
+    int fd_map[fd_count];
+    switch (processChannelMode) {
+    case QProcess::ForwardedChannels:
+        fd_map[0] = stdinChannel.pipe[0];
+        fd_map[1] = QT_FILENO(stdout);
+        fd_map[2] = QT_FILENO(stderr);
+        break;
+    case QProcess::MergedChannels:
+        fd_map[0] = stdinChannel.pipe[0];
+        fd_map[1] = stdoutChannel.pipe[1];
+        fd_map[2] = stdoutChannel.pipe[1];
+        break;
+    case QProcess::SeparateChannels:
+        fd_map[0] = stdinChannel.pipe[0];
+        fd_map[1] = stdoutChannel.pipe[1];
+        fd_map[2] = stderrChannel.pipe[1];
+        break;
+    }
+
+    pid_t childPid = doSpawn(fd_count, fd_map, argv, envp, workingDir, false);
+
+    if (childPid == -1) {
+        QString error = qt_error_string(errno);
+        qt_safe_write(childStartedPipe[1], error.data(), error.length() * sizeof(QChar));
+        qt_safe_close(childStartedPipe[1]);
+        childStartedPipe[1] = -1;
+    }
+
+    return childPid;
+}
+#endif // Q_OS_QNX
 
 qint64 QProcessPrivate::bytesAvailableFromStdout() const
 {
@@ -1171,6 +1291,42 @@ void QProcessPrivate::_q_notified()
 {
 }
 
+#if defined(Q_OS_QNX)
+bool QProcessPrivate::startDetached(const QString &program, const QStringList &arguments, const QString &workingDirectory, qint64 *pid)
+{
+    const int fd_count = 3;
+    int fd_map[fd_count] = { QT_FILENO(stdin), QT_FILENO(stdout), QT_FILENO(stderr) };
+
+    QList<QByteArray> enc_args;
+    enc_args.append(QFile::encodeName(program));
+    for (int i = 0; i < arguments.size(); ++i)
+        enc_args.append(arguments.at(i).toLocal8Bit());
+
+    const int argc = enc_args.size();
+    QScopedArrayPointer<char*> raw_argv(new char*[argc + 1]);
+    for (int i = 0; i < argc; ++i)
+        raw_argv[i] = const_cast<char *>(enc_args.at(i).data());
+    raw_argv[argc] = 0;
+
+    char **envp = 0; // inherit environment
+
+    // Encode the working directory if it's non-empty, otherwise just pass 0.
+    const char *workingDirPtr = 0;
+    QByteArray encodedWorkingDirectory;
+    if (!workingDirectory.isEmpty()) {
+        encodedWorkingDirectory = QFile::encodeName(workingDirectory);
+        workingDirPtr = encodedWorkingDirectory.constData();
+    }
+
+    pid_t childPid = doSpawn(fd_count, fd_map, raw_argv.data(), envp, workingDirPtr, true);
+    if (pid && childPid != -1)
+        *pid = childPid;
+
+    return childPid != -1;
+}
+
+#else
+
 bool QProcessPrivate::startDetached(const QString &program, const QStringList &arguments, const QString &workingDirectory, qint64 *pid)
 {
     processManager()->start();
@@ -1184,7 +1340,7 @@ bool QProcessPrivate::startDetached(const QString &program, const QStringList &a
     int pidPipe[2];
     qt_safe_pipe(pidPipe);
 
-    pid_t childPid = qt_fork();
+    pid_t childPid = fork();
     if (childPid == 0) {
         struct sigaction noaction;
         memset(&noaction, 0, sizeof(noaction));
@@ -1196,7 +1352,7 @@ bool QProcessPrivate::startDetached(const QString &program, const QStringList &a
         qt_safe_close(startedPipe[0]);
         qt_safe_close(pidPipe[0]);
 
-        pid_t doubleForkPid = qt_fork();
+        pid_t doubleForkPid = fork();
         if (doubleForkPid == 0) {
             qt_safe_close(pidPipe[1]);
 
@@ -1284,6 +1440,7 @@ bool QProcessPrivate::startDetached(const QString &program, const QStringList &a
     qt_safe_close(pidPipe[0]);
     return success;
 }
+#endif // Q_OS_QNX
 
 void QProcessPrivate::initializeProcessManager()
 {

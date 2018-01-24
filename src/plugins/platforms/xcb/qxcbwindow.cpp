@@ -1,35 +1,35 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** All rights reserved.
 ** Contact: Nokia Corporation (qt-info@nokia.com)
 **
 ** This file is part of the plugins of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
 ** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** This file may be used under the terms of the GNU Lesser General Public
+** License version 2.1 as published by the Free Software Foundation and
+** appearing in the file LICENSE.LGPL included in the packaging of this
+** file. Please review the following information to ensure the GNU Lesser
+** General Public License version 2.1 requirements will be met:
+** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
+** rights. These rights are described in the Nokia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU General
+** Public License version 3.0 as published by the Free Software Foundation
+** and appearing in the file LICENSE.GPL included in the packaging of this
+** file. Please review the following information to ensure the GNU General
+** Public License version 3.0 requirements will be met:
+** http://www.gnu.org/copyleft/gpl.html.
 **
-**
-**
+** Other Usage
+** Alternatively, this file may be used in accordance with the terms and
+** conditions contained in a signed written agreement between you and Nokia.
 **
 **
 **
@@ -49,7 +49,32 @@
 #include "qdri2context.h"
 #endif
 
+// Fix xcb-icccm 3.8 support
+#define class class_name
 #include <xcb/xcb_icccm.h>
+#undef class
+
+#ifdef XCB_ICCCM_NUM_WM_SIZE_HINTS_ELEMENTS
+#define xcb_wm_hints_t xcb_icccm_wm_hints_t
+#define xcb_wm_hints_set_iconic xcb_icccm_wm_hints_set_iconic
+#define xcb_wm_hints_set_normal xcb_icccm_wm_hints_set_normal
+#define xcb_set_wm_hints xcb_icccm_set_wm_hints
+
+#define xcb_wm_hints_t xcb_icccm_wm_hints_t
+#define xcb_get_wm_hints_reply xcb_icccm_get_wm_hints_reply
+#define xcb_get_wm_hints xcb_icccm_get_wm_hints
+#define xcb_set_wm_hints xcb_icccm_set_wm_hints
+#define xcb_set_wm_normal_hints xcb_icccm_set_wm_normal_hints
+#define xcb_size_hints_set_base_size xcb_icccm_size_hints_set_base_size
+#define xcb_size_hints_set_max_size xcb_icccm_size_hints_set_max_size
+#define xcb_size_hints_set_min_size xcb_icccm_size_hints_set_min_size
+#define xcb_size_hints_set_position xcb_icccm_size_hints_set_position
+#define xcb_size_hints_set_resize_inc xcb_icccm_size_hints_set_resize_inc
+#define xcb_size_hints_set_size xcb_icccm_size_hints_set_size
+#define xcb_size_hints_set_win_gravity xcb_icccm_size_hints_set_win_gravity
+#define xcb_wm_hints_t xcb_icccm_wm_hints_t
+#define XCB_WM_STATE_ICONIC XCB_ICCCM_WM_STATE_ICONIC
+#endif
 
 #include <private/qapplication_p.h>
 #include <private/qwindowsurface_p.h>
@@ -113,7 +138,8 @@ QXcbWindow::QXcbWindow(QWidget *tlw)
 
 #if defined(XCB_USE_GLX) || defined(XCB_USE_EGL)
     if (tlw->platformWindowFormat().windowApi() == QPlatformWindowFormat::OpenGL
-        && QApplicationPrivate::platformIntegration()->hasCapability(QPlatformIntegration::OpenGL))
+        && QApplicationPrivate::platformIntegration()->hasCapability(QPlatformIntegration::OpenGL)
+        || tlw->platformWindowFormat().alpha())
     {
 #if defined(XCB_USE_GLX)
         XVisualInfo *visualInfo = qglx_findVisualInfo(DISPLAY_FROM_XCB(m_screen),m_screen->screenNumber(), tlw->platformWindowFormat());
@@ -131,13 +157,17 @@ QXcbWindow::QXcbWindow(QWidget *tlw)
         visualInfo = XGetVisualInfo(DISPLAY_FROM_XCB(this), VisualIDMask, &visualInfoTemplate, &matchingCount);
 #endif //XCB_USE_GLX
         if (visualInfo) {
+            m_depth = visualInfo->depth;
+            m_format = (m_depth == 32) ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32;
             Colormap cmap = XCreateColormap(DISPLAY_FROM_XCB(this), m_screen->root(), visualInfo->visual, AllocNone);
 
             XSetWindowAttributes a;
+            a.background_pixel = WhitePixel(DISPLAY_FROM_XCB(this), m_screen->screenNumber());
+            a.border_pixel = BlackPixel(DISPLAY_FROM_XCB(this), m_screen->screenNumber());
             a.colormap = cmap;
             m_window = XCreateWindow(DISPLAY_FROM_XCB(this), m_screen->root(), tlw->x(), tlw->y(), tlw->width(), tlw->height(),
                                       0, visualInfo->depth, InputOutput, visualInfo->visual,
-                                      CWColormap, &a);
+                                      CWBackPixel|CWBorderPixel|CWColormap, &a);
 
             printf("created GL window: %d\n", m_window);
         } else {
@@ -147,6 +177,8 @@ QXcbWindow::QXcbWindow(QWidget *tlw)
 #endif //defined(XCB_USE_GLX) || defined(XCB_USE_EGL)
     {
         m_window = xcb_generate_id(xcb_connection());
+        m_depth = m_screen->screen()->root_depth;
+        m_format = (m_depth == 32) ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32;
 
         Q_XCB_CALL(xcb_create_window(xcb_connection(),
                                      XCB_COPY_FROM_PARENT,            // depth -- same as root
@@ -509,7 +541,7 @@ QPlatformGLContext *QXcbWindow::glContext() const
 
         EGLSurface eglSurface = eglCreateWindowSurface(display,config,(EGLNativeWindowType)m_window,0);
         QXcbWindow *that = const_cast<QXcbWindow *>(this);
-        that->m_context = new QEGLPlatformContext(display, config, eglContextAttrs.data(), eglSurface, EGL_OPENGL_ES_API);
+        that->m_context = new QEGLPlatformContext(display, config, eglContextAttrs.data(), eglSurface, EGL_OPENGL_ES_API, static_cast<QEGLPlatformContext *>(widget()->platformWindowFormat().sharedGLContext()));
 #elif defined(XCB_USE_DRI2)
         QXcbWindow *that = const_cast<QXcbWindow *>(this);
         that->m_context = new QDri2Context(that);

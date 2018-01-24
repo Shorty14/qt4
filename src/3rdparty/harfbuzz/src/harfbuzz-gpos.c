@@ -1507,6 +1507,9 @@ static HB_Error  Lookup_PairPos1( GPOS_Instance*       gpi,
   if ( index >= ppf1->PairSetCount )
      return ERR(HB_Err_Invalid_SubTable);
 
+  if (!ppf1->PairSet[index].PairValueCount)
+      return HB_Err_Not_Covered;
+
   pvr = ppf1->PairSet[index].PairValueRecord;
   if ( !pvr )
     return ERR(HB_Err_Invalid_SubTable);
@@ -3011,6 +3014,9 @@ static HB_Error  Lookup_MarkMarkPos( GPOS_Instance*    gpi,
     i++;
     j--;
   }
+
+  if ( i > buffer->in_pos )
+    return HB_Err_Not_Covered;
 
   error = _HB_OPEN_Coverage_Index( &mmp->Mark2Coverage, IN_GLYPH( j ),
 			  &mark2_index );

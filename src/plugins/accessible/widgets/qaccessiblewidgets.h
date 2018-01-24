@@ -1,35 +1,35 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** All rights reserved.
 ** Contact: Nokia Corporation (qt-info@nokia.com)
 **
 ** This file is part of the plugins of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
 ** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** This file may be used under the terms of the GNU Lesser General Public
+** License version 2.1 as published by the Free Software Foundation and
+** appearing in the file LICENSE.LGPL included in the packaging of this
+** file. Please review the following information to ensure the GNU Lesser
+** General Public License version 2.1 requirements will be met:
+** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
+** rights. These rights are described in the Nokia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU General
+** Public License version 3.0 as published by the Free Software Foundation
+** and appearing in the file LICENSE.GPL included in the packaging of this
+** file. Please review the following information to ensure the GNU General
+** Public License version 3.0 requirements will be met:
+** http://www.gnu.org/copyleft/gpl.html.
 **
-**
-**
+** Other Usage
+** Alternatively, this file may be used in accordance with the terms and
+** conditions contained in a signed written agreement between you and Nokia.
 **
 **
 **
@@ -48,6 +48,7 @@
 #ifndef QT_NO_ACCESSIBILITY
 
 #include <QtCore/QPointer>
+#include <QtCore/QPair>
 
 QT_BEGIN_NAMESPACE
 
@@ -64,10 +65,61 @@ class QAbstractItemView;
 class QDockWidget;
 class QDockWidgetLayout;
 class QMainWindow;
+class QTextCursor;
+class QTextDocument;
+
+class QAccessibleTextWidget : public QAccessibleWidgetEx,
+                              public QAccessibleTextInterface,
+                              public QAccessibleEditableTextInterface
+{
+public:
+    QAccessibleTextWidget(QWidget *o, Role r = EditableText, const QString& name = QString());
+    void addSelection(int startOffset, int endOffset);
+    void setSelection(int selectionIndex, int startOffset, int endOffset);
+    void removeSelection(int selectionIndex);
+    void selection(int selectionIndex, int *startOffset, int *endOffset);
+    int selectionCount();
+
+    int characterCount();
+
+    void setCursorPosition(int position);
+    int cursorPosition();
+
+    QString text(int startOffset, int endOffset);
+
+    QString textAtOffset(int offset, QAccessible2::BoundaryType boundaryType,
+                         int *startOffset, int *endOffset);
+    QString textBeforeOffset (int offset, QAccessible2::BoundaryType boundaryType,
+                              int *startOffset, int *endOffset);
+    QString textAfterOffset(int offset, QAccessible2::BoundaryType boundaryType,
+                            int *startOffset, int *endOffset);
+
+    QString attributes(int offset, int *startOffset, int *endOffset);
+
+    void deleteText(int startOffset, int endOffset);
+    void insertText(int offset, const QString &text);
+
+    void copyText(int startOffset, int endOffset);
+    void cutText(int startOffset, int endOffset);
+    void pasteText(int offset);
+    void setAttributes(int startOffset, int endOffset, const QString &attributes);
+
+    void replaceText(int startOffset, int endOffset, const QString &text);
+
+    QRect characterRect(int offset, QAccessible2::CoordinateType coordType);
+    int offsetAtPoint(const QPoint &point, QAccessible2::CoordinateType coordType);
+protected:
+    QTextCursor textCursorForRange(int startOffset, int endOffset) const;
+    QPair<int, int> getBoundaries(int offset, QAccessible2::BoundaryType boundaryType);
+    virtual QPoint scrollBarsCurrentPosition() const;
+    virtual QTextCursor textCursor() const = 0;
+    virtual void setTextCursor(const QTextCursor &) = 0;
+    virtual QTextDocument *textDocument() const = 0;
+    virtual QWidget *viewport() const = 0;
+};
 
 #ifndef QT_NO_TEXTEDIT
-class QAccessibleTextEdit : public QAccessibleWidgetEx, public QAccessibleTextInterface,
-                            public QAccessibleEditableTextInterface
+class QAccessibleTextEdit : public QAccessibleTextWidget
 {
     Q_ACCESSIBLE_OBJECT
 public:
@@ -85,38 +137,22 @@ public:
     int childCount() const;
 
     // QAccessibleTextInterface
-    void addSelection(int startOffset, int endOffset);
-    QString attributes(int offset, int *startOffset, int *endOffset);
-    int cursorPosition();
-    QRect characterRect(int offset, QAccessible2::CoordinateType coordType);
-    int selectionCount();
-    int offsetAtPoint(const QPoint &point, QAccessible2::CoordinateType coordType);
-    void selection(int selectionIndex, int *startOffset, int *endOffset);
-    QString text(int startOffset, int endOffset);
-    QString textBeforeOffset (int offset, QAccessible2::BoundaryType boundaryType,
-            int *startOffset, int *endOffset);
-    QString textAfterOffset(int offset, QAccessible2::BoundaryType boundaryType,
-            int *startOffset, int *endOffset);
-    QString textAtOffset(int offset, QAccessible2::BoundaryType boundaryType,
-            int *startOffset, int *endOffset);
-    void removeSelection(int selectionIndex);
-    void setCursorPosition(int position);
-    void setSelection(int selectionIndex, int startOffset, int endOffset);
-    int characterCount();
     void scrollToSubstring(int startIndex, int endIndex);
 
     // QAccessibleEditableTextInterface
     void copyText(int startOffset, int endOffset);
-    void deleteText(int startOffset, int endOffset);
-    void insertText(int offset, const QString &text);
     void cutText(int startOffset, int endOffset);
     void pasteText(int offset);
-    void replaceText(int startOffset, int endOffset, const QString &text);
     void setAttributes(int startOffset, int endOffset, const QString &attributes);
 
 protected:
     QTextEdit *textEdit() const;
 
+    QPoint scrollBarsCurrentPosition() const;
+    QTextCursor textCursor() const;
+    void setTextCursor(const QTextCursor &textCursor);
+    QTextDocument *textDocument() const;
+    QWidget *viewport() const;
 private:
     int childOffset;
 };

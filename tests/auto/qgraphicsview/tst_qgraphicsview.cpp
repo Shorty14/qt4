@@ -1,35 +1,35 @@
 /****************************************************************************
 **
-** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** All rights reserved.
 ** Contact: Nokia Corporation (qt-info@nokia.com)
 **
 ** This file is part of the test suite of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
 ** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** This file may be used under the terms of the GNU Lesser General Public
+** License version 2.1 as published by the Free Software Foundation and
+** appearing in the file LICENSE.LGPL included in the packaging of this
+** file. Please review the following information to ensure the GNU Lesser
+** General Public License version 2.1 requirements will be met:
+** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
+** rights. These rights are described in the Nokia Qt LGPL Exception
 ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
 **
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU General
+** Public License version 3.0 as published by the Free Software Foundation
+** and appearing in the file LICENSE.GPL included in the packaging of this
+** file. Please review the following information to ensure the GNU General
+** Public License version 3.0 requirements will be met:
+** http://www.gnu.org/copyleft/gpl.html.
 **
-**
-**
+** Other Usage
+** Alternatively, this file may be used in accordance with the terms and
+** conditions contained in a signed written agreement between you and Nokia.
 **
 **
 **
@@ -70,6 +70,7 @@
 #include <QtGui/QPushButton>
 #include <QtGui/QInputContext>
 #include <QtGui/QDesktopWidget>
+#include <private/qgraphicsscene_p.h>
 #include <private/qgraphicsview_p.h>
 #include "../../shared/util.h"
 #include "../platformquirks.h"
@@ -138,6 +139,14 @@ protected:
     QEvent::Type spied;
 };
 
+#if defined QT_BUILD_INTERNAL
+class FriendlyGraphicsScene : public QGraphicsScene
+{
+    friend class tst_QGraphicsView;
+    Q_DECLARE_PRIVATE(QGraphicsScene);
+};
+#endif
+
 class tst_QGraphicsView : public QObject
 {
     Q_OBJECT
@@ -168,6 +177,10 @@ private slots:
     void ensureVisibleRect();
     void fitInView();
     void itemsAtPoint();
+#if defined QT_BUILD_INTERNAL
+    void itemsAtPosition_data();
+    void itemsAtPosition();
+#endif
     void itemsInRect();
     void itemsInRect_cosmeticAdjust_data();
     void itemsInRect_cosmeticAdjust();
@@ -1345,6 +1358,55 @@ void tst_QGraphicsView::itemsAtPoint()
     QCOMPARE(items.takeFirst()->zValue(), qreal(0));
     QCOMPARE(items.takeFirst()->zValue(), qreal(-1));
 }
+
+#if defined QT_BUILD_INTERNAL
+void tst_QGraphicsView::itemsAtPosition_data()
+{
+    QTest::addColumn<float>("rotation");
+    QTest::addColumn<float>("scale");
+    QTest::addColumn<QPoint>("viewPos");
+    QTest::addColumn<bool>("ignoreTransform");
+    QTest::addColumn<bool>("hit");
+    QTest::newRow("scaled + ignore transform, no hit") << 0.0f << 1000.0f << QPoint(0, 0) << true << false;
+    QTest::newRow("scaled + ignore transform, hit") << 0.0f << 1000.0f << QPoint(100, 100) << true << true;
+    QTest::newRow("rotated + scaled, no hit") << 45.0f << 2.0f << QPoint(90, 90) << false << false;
+    QTest::newRow("rotated + scaled, hit") << 45.0f << 2.0f << QPoint(100, 100) << false << true;
+}
+
+void tst_QGraphicsView::itemsAtPosition()
+{
+    QFETCH(float, rotation);
+    QFETCH(float, scale);
+    QFETCH(QPoint, viewPos);
+    QFETCH(bool, ignoreTransform);
+    QFETCH(bool, hit);
+
+    FriendlyGraphicsScene scene;
+    scene.setSceneRect(QRect(-100, -100, 200, 200));
+    QGraphicsItem *item = scene.addRect(-5, -5, 10, 10);
+
+    if (ignoreTransform)
+        item->setFlag(QGraphicsItem::ItemIgnoresTransformations);
+
+    QGraphicsView view;
+    view.setFrameStyle(QFrame::NoFrame);
+    view.resize(200, 200);
+    view.scale(scale, scale);
+    view.rotate(rotation);
+    view.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    view.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    view.setScene(&scene);
+    view.show();
+    QTest::qWaitForWindowShown(&view);
+
+    QPoint screenPos = view.viewport()->mapToGlobal(viewPos);
+    QPointF scenePos = view.mapToScene(viewPos);
+    QGraphicsScenePrivate *viewPrivate = scene.d_func();
+    QList<QGraphicsItem *> items;
+    items = viewPrivate->itemsAtPosition(screenPos, scenePos, view.viewport());
+    QCOMPARE(!items.empty(), hit);
+}
+#endif
 
 void tst_QGraphicsView::itemsInRect()
 {
@@ -3054,7 +3116,7 @@ void tst_QGraphicsView::task210599_unsetDragWhileDragging()
         QApplication::sendEvent(view.viewport(), &move);
     }
 
-    // Check that no draggin has occured...
+    // Check that no draggin has occurred...
     QCOMPARE(basePos, view.mapFromScene(0, 0));
 }
 
